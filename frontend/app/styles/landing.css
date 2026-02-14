@@ -1,0 +1,69 @@
+/* ═══════ Animaciones de estrellas ═══════ */
+@keyframes twinkle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(0.8); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* ═══════ Video slider ═══════ */
+.video-slider-track {
+  display: flex;
+  gap: 1.5rem;
+  transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: transform;
+}
+
+.video-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  aspect-ratio: 16 / 9;
+  flex-shrink: 0;
+}
+
+.video-card video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+
+.video-card:hover video {
+  transform: scale(1.05);
+}
+
+/* ═══════ Calendar tooltip ═══════ */
+.cal-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  margin-bottom: 6px;
+  z-index: 10;
+}
+
+.group:hover .cal-tooltip {
+  opacity: 1;
+}
+
+/* ═══════ Responsive slider cards ═══════ */
+.video-card {
+  width: calc(100% - 0px);
+}
+@media (min-width: 768px) {
+  .video-card { width: calc(50% - 12px); }
+}
+@media (min-width: 1024px) {
+  .video-card { width: calc(33.333% - 16px); }
+}
