@@ -1,18 +1,42 @@
 @import "tailwindcss";
-@plugin "daisyui" {
-  themes: all;
-}
 
+@plugin "daisyui" {
+  themes: dark --default, light;
+}
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif,
-    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-sans: "Quicksand", sans-serif;
+  --font-heading: "Fredoka", sans-serif;
 }
 
-/* html,body {
-  @apply bg-white dark:bg-gray-950;
+/* ══════════ Tema Dark (default - Space theme) ══════════ */
+[data-theme="dark"] {
+  --p: #06B6D4;
+  --s: #E11D74;
+  --a: #6D28D9;
+  --n: #1E1B4B;
+  --b1: #12122B;
+  --b2: #0A0A1F;
+  --b3: #1E1B4B;
+  --bc: #F9FAFB;
+  --in: #38bdf8;
+  --su: #10B981;
+  --wa: #F59E0B;
+  --er: #EF4444;
+}
 
-  @media (prefers-color-scheme: auto) {
-    color-scheme: auto;
-  }
-} */
+/* ══════════ Tema Light ══════════ */
+[data-theme="light"] {
+  --p: #0891B2;
+  --s: #DB2777;
+  --a: #7C3AED;
+  --n: #374151;
+  --b1: #FFFFFF;
+  --b2: #F0F4FF;
+  --b3: #E2E8F0;
+  --bc: #1E293B;
+  --in: #0EA5E9;
+  --su: #16A34A;
+  --wa: #D97706;
+  --er: #DC2626;
+}

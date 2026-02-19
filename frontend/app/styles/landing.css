@@ -9,10 +9,108 @@
   50% { transform: translateY(-10px); }
 }
 
+/* ═══════ Botones 3D Space ═══════ */
+.btn-space-primary {
+  background: linear-gradient(135deg, #E11D74, #6D28D9);
+  color: white;
+  padding: 14px 32px;
+  border-radius: 50px;
+  font-weight: 600;
+  font-family: 'Quicksand', sans-serif;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 8px 0 #0A0A1F, 0 10px 20px -5px rgba(225, 29, 116, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.btn-space-primary:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 0 #0A0A1F, 0 15px 30px -5px rgba(6, 182, 212, 0.4);
+  border-color: #06B6D4;
+}
+
+.btn-space-primary:active {
+  transform: translateY(4px);
+  box-shadow: 0 4px 0 #0A0A1F;
+}
+
+.btn-space-secondary {
+  background: #12122B;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 12px 30px;
+  border-radius: 50px;
+  font-weight: 600;
+  font-family: 'Quicksand', sans-serif;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.btn-space-secondary:hover {
+  background: #1E1B4B;
+  border-color: white;
+  transform: scale(1.05);
+}
+
+/* Light theme button adjustments */
+[data-theme="light"] .btn-space-primary {
+  box-shadow: 0 8px 0 #c4b5fd, 0 10px 20px -5px rgba(225, 29, 116, 0.3);
+}
+
+[data-theme="light"] .btn-space-primary:hover {
+  box-shadow: 0 12px 0 #c4b5fd, 0 15px 30px -5px rgba(6, 182, 212, 0.4);
+}
+
+[data-theme="light"] .btn-space-secondary {
+  background: white;
+  border-color: #6D28D9;
+  color: #1E293B;
+}
+
+[data-theme="light"] .btn-space-secondary:hover {
+  background: #F0F4FF;
+  border-color: #E11D74;
+}
+
+/* ═══════ Gallery button ═══════ */
+.btn-gallery {
+  background: linear-gradient(135deg, #6D28D9, #E11D74);
+  color: white;
+  padding: 16px 40px;
+  border-radius: 50px;
+  font-weight: 700;
+  font-size: 1.2rem;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 8px 0 #0A0A1F, 0 10px 20px -5px rgba(225, 29, 116, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.btn-gallery:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 0 #0A0A1F, 0 15px 30px -5px rgba(6, 182, 212, 0.4);
+  border-color: #06B6D4;
+}
+
+[data-theme="light"] .btn-gallery {
+  box-shadow: 0 8px 0 #c4b5fd, 0 10px 20px -5px rgba(225, 29, 116, 0.3);
+}
+
 /* ═══════ Video slider ═══════ */
 .video-slider-track {
   display: flex;
-  gap: 1.5rem;
+  gap: 20px;
   transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   will-change: transform;
 }
@@ -20,20 +118,133 @@
 .video-card {
   position: relative;
   overflow: hidden;
-  border-radius: 1rem;
-  aspect-ratio: 16 / 9;
+  border-radius: 16px;
   flex-shrink: 0;
+  cursor: pointer;
 }
 
 .video-card video {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  pointer-events: none;
   transition: transform 0.5s ease;
 }
 
 .video-card:hover video {
   transform: scale(1.05);
+}
+
+/* ═══════ Vertical video cards (9:16 aspect ratio) ═══════ */
+.video-card {
+  aspect-ratio: 9 / 16;
+  width: calc(33.333% - 14px);
+}
+
+@media (min-width: 640px) and (max-width: 767px) {
+  .video-card {
+    width: calc(50% - 10px);
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .video-card {
+    width: calc(50% - 10px);
+  }
+}
+
+@media (max-width: 639px) {
+  .video-card {
+    width: calc(85% - 10px);
+  }
+}
+
+@media (min-width: 1024px) {
+  .video-card {
+    width: calc(33.333% - 14px);
+  }
+}
+
+/* ═══════ Featured video container ═══════ */
+.featured-video-container {
+  position: relative;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 30px 50px -20px rgba(0, 0, 0, 0.8);
+  border: 2px solid rgba(6, 182, 212, 0.3);
+  transition: all 0.5s ease;
+  aspect-ratio: 16 / 9;
+}
+
+.featured-video-container:hover {
+  border-color: #E11D74;
+  box-shadow: 0 40px 60px -20px rgba(225, 29, 116, 0.5);
+  transform: translateY(-5px);
+}
+
+.featured-video-container video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+[data-theme="light"] .featured-video-container {
+  box-shadow: 0 30px 50px -20px rgba(0, 0, 0, 0.3);
+  border-color: rgba(6, 182, 212, 0.5);
+}
+
+/* ═══════ Play button ═══════ */
+.play-button-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80px;
+  height: 80px;
+  background: rgba(225, 29, 116, 0.8);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid white;
+  box-shadow: 0 0 30px rgba(225, 29, 116, 0.5);
+}
+
+.play-button-overlay:hover {
+  transform: translate(-50%, -50%) scale(1.1);
+  background: #E11D74;
+  box-shadow: 0 0 50px rgba(225, 29, 116, 0.8);
+}
+
+@media (max-width: 768px) {
+  .play-button-overlay {
+    width: 60px;
+    height: 60px;
+  }
+}
+
+/* ═══════ Package card ═══════ */
+.package-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.package-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #06B6D4, #E11D74);
+  transform: scaleX(0);
+  transition: transform 0.4s ease;
+}
+
+.package-card:hover::before {
+  transform: scaleX(1);
 }
 
 /* ═══════ Calendar tooltip ═══════ */
@@ -42,14 +253,14 @@
   bottom: 100%;
   left: 50%;
   transform: translateX(-50%);
-  padding: 4px 10px;
+  padding: 6px 12px;
   border-radius: 8px;
   font-size: 12px;
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   z-index: 10;
 }
 
@@ -57,13 +268,45 @@
   opacity: 1;
 }
 
-/* ═══════ Responsive slider cards ═══════ */
-.video-card {
-  width: calc(100% - 0px);
+/* ═══════ Mobile link styles ═══════ */
+.mobile-link {
+  background: rgba(6, 182, 212, 0.1);
+  border: 1px solid rgba(6, 182, 212, 0.2);
+  color: inherit;
+  font-weight: 500;
+  transition: all 0.3s ease;
 }
-@media (min-width: 768px) {
-  .video-card { width: calc(50% - 12px); }
+
+.mobile-link:hover {
+  background: #06B6D4;
+  color: #0A0A1F;
+  border-color: #06B6D4;
 }
-@media (min-width: 1024px) {
-  .video-card { width: calc(33.333% - 16px); }
+
+/* ═══════ Social icon ═══════ */
+.social-icon {
+  transition: all 0.3s ease;
+}
+
+.social-icon:hover {
+  transform: scale(1.1);
+}
+
+/* ═══════ Scroll indicator mobile ═══════ */
+.scroll-indicator-mobile {
+  display: none;
+  text-align: center;
+  margin-top: 15px;
+}
+
+@media (max-width: 640px) {
+  .scroll-indicator-mobile {
+    display: block;
+  }
+}
+
+/* ═══════ Stars background for light theme ═══════ */
+[data-theme="light"] .star-dot {
+  background-color: rgba(109, 40, 217, 0.3) !important;
+  box-shadow: 0 0 6px rgba(109, 40, 217, 0.2) !important;
 }

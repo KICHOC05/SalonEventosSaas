@@ -51,7 +51,7 @@ export default function Root() {
 
 /* ── Error boundary ── */
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  let message = "Oops!";
+  let message = "¡Oops!";
   let details = "Ha ocurrido un error inesperado.";
   let stack: string | undefined;
 
@@ -59,7 +59,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     message = error.status === 404 ? "404" : "Error";
     details =
       error.status === 404
-        ? "Página no encontrada."
+        ? "Esta página no existe en nuestra galaxia."
         : error.statusText || details;
   } else if (import.meta.env.DEV && error instanceof Error) {
     details = error.message;
@@ -70,16 +70,25 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     <main className="flex items-center justify-center min-h-screen p-8">
       <div className="card bg-base-100 shadow-lg max-w-md w-full">
         <div className="card-body items-center text-center">
+          {/* Icono espacial */}
           <Rocket className="w-16 h-16 text-primary mb-4" />
+
+          {/* Código de error */}
           <h1 className="text-6xl font-bold text-error">{message}</h1>
+
+          {/* Descripción */}
           <p className="text-base-content/60 mt-2">{details}</p>
+
+          {/* Stack trace solo en desarrollo */}
           {stack && (
             <pre className="text-xs text-left w-full overflow-auto mt-4 p-3 bg-base-200 rounded-lg">
               {stack}
             </pre>
           )}
+
+          {/* Botón para volver */}
           <Link to="/" className="btn btn-primary mt-4">
-            Volver al inicio
+            🚀 Volver al inicio
           </Link>
         </div>
       </div>
