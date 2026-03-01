@@ -4,11 +4,9 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.example.demo.common.enums.TenantStatus;
@@ -20,21 +18,33 @@ import com.example.demo.user.repository.UserRepository;
 
 import java.io.IOException;
 
-@Component
-@RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
-    private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
+    private final TenantRepository tenantRepository;
+
+    public JwtAuthenticationFilter(JwtService jwtService,
+            UserRepository userRepository,
+            TenantRepository tenantRepository) {
+        this.jwtService = jwtService;
+        this.userRepository = userRepository;
+        this.tenantRepository = tenantRepository;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain)
+            HttpServletResponse response,
+            FilterChain filterChain)
             throws ServletException, IOException {
 
         String header = request.getHeader("Authorization");
+
+        System.out.println("===== FILTER START =====");
+        System.out.println("PATH: " + request.getRequestURI());
+        System.out.println("METHOD: " + request.getMethod());
+        System.out.println("AUTH HEADER: [" + header + "]");
+        System.out.println("========================");
 
         // 🔹 Si no hay token, continuar sin autenticar
         if (header == null || !header.startsWith("Bearer ")) {
@@ -51,7 +61,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         try {
-
             // 🔹 Extraer claims
             String userPublicId = jwtService.getUserPublicId(token);
             Long tenantId = jwtService.getTenantId(token);
@@ -62,9 +71,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             Tenant tenant = tenantRepository.findById(tenantId).orElse(null);
 
             if (tenant == null ||
-                tenant.getStatus() == TenantStatus.SUSPENDED ||
-                tenant.getStatus() == TenantStatus.CANCELLED) {
-
+                    tenant.getStatus() == TenantStatus.SUSPENDED ||
+                    tenant.getStatus() == TenantStatus.CANCELLED) {
                 forbidden(response, "Tenant inválido o inactivo");
                 return;
             }
@@ -76,13 +84,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 forbidden(response, "Usuario inválido o desactivado");
                 return;
             }
-            
-            System.out.println("===== JWT FILTER DEBUG =====");
-            System.out.println("USER AUTHENTICATED: " + user.getEmail());
-            System.out.println("ROLE FROM DB: " + user.getRole());
-            System.out.println("ROLE FROM TOKEN: " + roleFromToken);
-            System.out.println("TENANT ID: " + tenantId);
-            System.out.println("============================");
 
             // 🔹 Validar pertenencia al tenant
             if (!user.getTenant().getId().equals(tenantId)) {
@@ -102,41 +103,45 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             tenantId,
                             branchId,
                             user.getId(),
-                            user.getRole()
-                    )
-            );
+                            user.getRole()));
 
-            // 🔹 Crear UserDetails
+            // 🔹 Crear autenticación
             CustomUserDetails userDetails = new CustomUserDetails(user);
 
-            UsernamePasswordAuthenticationToken authToken =
-                    new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities()
-                    );
+            UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                    userDetails,
+                    null,
+                    userDetails.getAuthorities());
 
             authToken.setDetails(
-                    new WebAuthenticationDetailsSource().buildDetails(request)
-            );
+                    new WebAuthenticationDetailsSource().buildDetails(request));
 
             SecurityContextHolder.getContext().setAuthentication(authToken);
-            
-            System.out.println("SPRING AUTH: " +
-            	    SecurityContextHolder.getContext().getAuthentication().getAuthorities());
+
+            System.out.println("===== JWT FILTER DEBUG =====");
+            System.out.println("USER: " + user.getEmail());
+            System.out.println("ROLE: " + user.getRole());
+            System.out.println("AUTH: " + SecurityContextHolder.getContext()
+                    .getAuthentication().getAuthorities());
+            System.out.println("============================");
+
+            // 🔥 CLAVE: filterChain.doFilter DENTRO del mismo try
+            filterChain.doFilter(request, response);
 
         } catch (Exception e) {
-            forbidden(response, "Error de autenticación");
-            return;
+            e.printStackTrace();
+            forbidden(response, "Error de autenticación: " + e.getMessage());
+        } finally {
+            // 🔹 Limpiar SIEMPRE al final
+            TenantContext.clear();
         }
-
-        // 🔹 Continuar flujo
-        filterChain.doFilter(request, response);
     }
 
-    private void forbidden(HttpServletResponse response, String message) throws IOException {
+    private void forbidden(HttpServletResponse response, String message)
+            throws IOException {
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.setContentType("application/json");
-        response.getWriter().write("{\"error\":\"" + message + "\"}");
+        response.getWriter().write("{\"error\": \"" + message + "\"}");
     }
+
 }
