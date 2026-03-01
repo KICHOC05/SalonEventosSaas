@@ -94,15 +94,25 @@ export async function apiFetch<T>(
 
     if (response.status === 401 || response.status === 403) {
         clearStoredAuth();
-        // Redirigir al login si estamos en el dashboard
-        if (typeof window !== "undefined" && window.location.pathname.startsWith("/dashboard")) {
+        if (
+            typeof window !== "undefined" &&
+            window.location.pathname.startsWith("/dashboard")
+        ) {
             window.location.href = "/dashboard/login";
         }
         throw new ApiError("Sesión expirada", response.status);
     }
 
     if (!response.ok) {
-        const errorBody = await response.json().catch(() => ({}));
+        let errorBody: any = {};
+        try {
+            const text = await response.text();
+            if (text && text.trim().length > 0) {
+                errorBody = JSON.parse(text);
+            }
+        } catch {
+            // ignorar error de parseo
+        }
         throw new ApiError(
             errorBody.error || `Error ${response.status}`,
             response.status,
@@ -110,10 +120,20 @@ export async function apiFetch<T>(
         );
     }
 
-    // Para respuestas vacías (204 No Content)
-    if (response.status === 204) return {} as T;
+    // ✅ Leer el body como texto PRIMERO
+    const text = await response.text();
 
-    return response.json();
+    // ✅ Si no hay contenido, retornar vacío
+    if (!text || text.trim().length === 0) {
+        return {} as T;
+    }
+
+    // ✅ Intentar parsear
+    try {
+        return JSON.parse(text) as T;
+    } catch {
+        return {} as T;
+    }
 }
 
 // ─── Error personalizado ───
@@ -135,4 +155,92 @@ export async function login(data: LoginRequest): Promise<LoginResponse> {
         method: "POST",
         body: JSON.stringify(data),
     });
+}
+
+// ─── Types para Users ───
+export interface UserResponse {
+    publicId: string;
+    name: string;
+    email: string;
+    role: "ADMIN" | "MANAGER" | "CASHIER" | "EMPLOYEE";
+    active: boolean;
+    branchId: number;
+    branchName: string;
+    createdAt: string;
+}
+
+export interface CreateUserRequest {
+    name: string;
+    email: string;
+    password: string;
+    branchId: number;
+    role: "ADMIN" | "MANAGER" | "CASHIER" | "EMPLOYEE";
+}
+
+export interface UpdateUserRequest {
+    name?: string;
+    branchId?: number;
+    role?: "ADMIN" | "MANAGER" | "CASHIER" | "EMPLOYEE";
+    active?: boolean;
+}
+
+export interface BranchResponse {
+    id: number;
+    publicId: string;
+    name: string;
+    address: string;
+    phone: string;
+}
+
+// ─── Users API ───
+export async function fetchUsers(): Promise<UserResponse[]> {
+    return apiFetch<UserResponse[]>("/users");
+}
+
+export async function fetchUserByPublicId(publicId: string): Promise<UserResponse> {
+    return apiFetch<UserResponse>(`/users/${publicId}`);
+}
+
+export async function createUser(data: CreateUserRequest): Promise<UserResponse> {
+    return apiFetch<UserResponse>("/users", {
+        method: "POST",
+        body: JSON.stringify(data),
+    });
+}
+
+export async function updateUser(
+    publicId: string,
+    data: UpdateUserRequest
+): Promise<UserResponse> {
+    return apiFetch<UserResponse>(`/users/${publicId}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+    });
+}
+
+export async function changeUserPassword(
+    publicId: string,
+    newPassword: string
+): Promise<void> {
+    await apiFetch<void>(
+        `/users/${publicId}/password?newPassword=${encodeURIComponent(newPassword)}`,
+        { method: "PATCH" }
+    );
+}
+
+export async function deactivateUser(publicId: string): Promise<void> {
+    await apiFetch<void>(`/users/${publicId}/deactivate`, {
+        method: "PATCH",
+    });
+}
+
+export async function deleteUser(publicId: string): Promise<void> {
+    await apiFetch<void>(`/users/${publicId}`, {
+        method: "DELETE",
+    });
+}
+
+// ─── Branches API ───
+export async function fetchBranches(): Promise<BranchResponse[]> {
+    return apiFetch<BranchResponse[]>("/branches");
 }

@@ -7,7 +7,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.example.demo.branch.model.Branch;
 import com.example.demo.branch.repository.BranchRepository;
-import com.example.demo.common.enums.UserRole;
 import com.example.demo.common.exception.BusinessException;
 import com.example.demo.common.exception.ResourceNotFoundException;
 import com.example.demo.security.TenantContext;
@@ -159,6 +158,28 @@ public class UserService {
         user.setActive(false);
 
         userRepository.save(user);
+    }
+
+    // ============================================================
+    // DELETE (HARD DELETE)
+    // ============================================================
+
+    @Transactional
+    public void delete(String publicId) {
+
+        Long tenantId = TenantContext.getTenantId();
+
+        User user = userRepository
+                .findByPublicIdAndTenant_Id(publicId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+
+        // No permitir que un admin se elimine a sí mismo
+        Long currentUserId = TenantContext.getUserId();
+        if (user.getId().equals(currentUserId)) {
+            throw new BusinessException("No puedes eliminarte a ti mismo");
+        }
+
+        userRepository.delete(user);
     }
 
     // ============================================================

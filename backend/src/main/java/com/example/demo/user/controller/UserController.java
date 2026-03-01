@@ -88,4 +88,16 @@ public class UserController {
         userService.deactivate(publicId);
         return ResponseEntity.ok().build();
     }
+
+    // =========================================
+    // DELETE USER (HARD DELETE - ADMIN ONLY)
+    // =========================================
+    @DeleteMapping("/{publicId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> delete(
+            @PathVariable String publicId) {
+
+        userService.delete(publicId);
+        return ResponseEntity.noContent().build();
+    }
 }

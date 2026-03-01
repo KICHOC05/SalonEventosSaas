@@ -32,7 +32,9 @@ public final class TenantContext {
     }
 
     public static Long getUserId() {
-        return requireContext().getUserId();
+        // Return null instead of throwing if context not set
+        TenantInfo info = CONTEXT.get();
+        return info != null ? info.getUserId() : null;
     }
 
     public static UserRole getRole() {
@@ -56,9 +58,9 @@ public final class TenantContext {
         private final UserRole role;
 
         public TenantInfo(Long tenantId,
-                          Long branchId,
-                          Long userId,
-                          UserRole role) {
+                Long branchId,
+                Long userId,
+                UserRole role) {
 
             this.tenantId = tenantId;
             this.branchId = branchId;

@@ -38,6 +38,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             FilterChain filterChain)
             throws ServletException, IOException {
 
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            System.out.println("===== CORS PREFLIGHT - SKIP JWT =====");
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String header = request.getHeader("Authorization");
 
         System.out.println("===== FILTER START =====");
