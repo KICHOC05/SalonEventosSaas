@@ -1,12 +1,15 @@
 import { type RouteConfig, route, index, layout } from "@react-router/dev/routes";
 
 export default [
-
+    // ── Sitio público ──
     layout("components/Layout.tsx", [
         index("routes/index.tsx"),
     ]),
 
+    // ── Login del dashboard
+    route("dashboard/login", "routes/dashboard/login.tsx"),
 
+    // ── Dashboard protegido ──
     layout("components/DashLayout.tsx", [
         route("dashboard", "routes/dashboard/dashboard.tsx"),
         route("dashboard/eventos", "routes/dashboard/eventos.tsx"),
@@ -18,9 +21,4 @@ export default [
     ]),
 
     route("/galeria", "routes/galeria.tsx"),
-
-    route("products", "routes/product-list.tsx"),
-    route("products/new", "routes/product-form.tsx", { id: "create-product" }),
-    route("products/:id", "routes/product-detail.tsx"),
-    route("products/:id/edit", "routes/product-form.tsx", { id: "edit-product" }),
 ] satisfies RouteConfig;

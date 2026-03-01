@@ -25,29 +25,25 @@ public class JwtService {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
-    // 🔥 Ahora usamos UUID público y enum real
     public String generateToken(
             String userPublicId,
             String email,
             Long tenantId,
             Long branchId,
-            UserRole role
-    ) {
+            UserRole role) {
         return Jwts.builder()
                 .subject(email)
                 .claims(Map.of(
                         "userPublicId", userPublicId,
                         "tenantId", tenantId,
                         "branchId", branchId,
-                        "role", role.name()
-                ))
+                        "role", role.name()))
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expirationMs))
                 .signWith(getKey())
                 .compact();
     }
 
-    // 🔹 Extraer claims una sola vez
     public Claims extractClaims(String token) {
         return Jwts.parser()
                 .verifyWith(getKey())
@@ -69,12 +65,22 @@ public class JwtService {
         return extractClaims(token).getSubject();
     }
 
+    // ✅ FIX: Usar Number en lugar de Long.class
     public Long getTenantId(String token) {
-        return extractClaims(token).get("tenantId", Long.class);
+        Object value = extractClaims(token).get("tenantId");
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        throw new IllegalStateException("tenantId no es un número válido en el token");
     }
 
+    // ✅ FIX: Usar Number en lugar de Long.class
     public Long getBranchId(String token) {
-        return extractClaims(token).get("branchId", Long.class);
+        Object value = extractClaims(token).get("branchId");
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        throw new IllegalStateException("branchId no es un número válido en el token");
     }
 
     public String getUserPublicId(String token) {
