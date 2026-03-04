@@ -47,7 +47,7 @@ public class ProductService {
 
         Long tenantId = TenantContext.getTenantId();
 
-        return productRepository.findAllByTenantId(tenantId)
+        return productRepository.findAllByTenant_IdAndActiveTrue(tenantId)
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
@@ -59,7 +59,7 @@ public class ProductService {
         Long tenantId = TenantContext.getTenantId();
 
         Product product = productRepository
-                .findByPublicIdAndTenantId(publicId, tenantId)
+                .findByPublicIdAndTenant_IdAndActiveTrue(publicId, tenantId)
                 .orElseThrow(() -> new EntityNotFoundException("Product not found"));
 
         return mapToResponse(product);
@@ -71,7 +71,7 @@ public class ProductService {
         Long tenantId = TenantContext.getTenantId();
 
         Product product = productRepository
-                .findByPublicIdAndTenantId(publicId, tenantId)
+                .findByPublicIdAndTenant_IdAndActiveTrue(publicId, tenantId)
                 .orElseThrow(() -> new EntityNotFoundException("Product not found"));
 
         product.setName(request.getName());
@@ -85,13 +85,13 @@ public class ProductService {
         return mapToResponse(product);
     }
 
-    // 🔹 DELETE (soft delete recomendado)
+    // 🔹 DELETE (soft)
     public void delete(String publicId) {
 
         Long tenantId = TenantContext.getTenantId();
 
         Product product = productRepository
-                .findByPublicIdAndTenantId(publicId, tenantId)
+                .findByPublicIdAndTenant_IdAndActiveTrue(publicId, tenantId)
                 .orElseThrow(() -> new EntityNotFoundException("Product not found"));
 
         product.setActive(false);
@@ -99,7 +99,6 @@ public class ProductService {
         productRepository.save(product);
     }
 
-    // 🔹 Mapper privado
     private ProductResponse mapToResponse(Product product) {
 
         ProductResponse response = new ProductResponse();
@@ -110,6 +109,8 @@ public class ProductService {
         response.setStock(product.getStock());
         response.setType(product.getType());
         response.setActive(product.getActive());
+        response.setCreatedAt(product.getCreatedAt());
+        response.setUpdatedAt(product.getUpdatedAt());
 
         return response;
     }
