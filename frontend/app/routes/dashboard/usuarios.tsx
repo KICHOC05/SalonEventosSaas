@@ -1,5 +1,6 @@
 // app/routes/usuarios.tsx
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router";
 import {
   UserPlus,
   Pencil,
@@ -19,6 +20,7 @@ import {
   EyeOff,
   CheckCircle2,
   XCircle,
+  Lock,
 } from "lucide-react";
 import {
   fetchUsers,
@@ -33,6 +35,7 @@ import {
   type UpdateUserRequest,
   type BranchResponse,
 } from "~/lib/api";
+import { useAuth } from "~/lib/auth"; // ← IMPORTAR
 
 type UserRole = "ADMIN" | "MANAGER" | "CASHIER" | "EMPLOYEE";
 
@@ -112,6 +115,52 @@ interface Toast {
 }
 
 export default function Usuarios() {
+  // ═══════════════════════════════════════════════════════
+  // PROTECCIÓN DE RUTA — Solo ADMIN y MANAGER
+  // ═══════════════════════════════════════════════════════
+  const { role, isAdmin, isManager } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isAdmin && !isManager) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isAdmin, isManager, navigate]);
+
+  // Si no tiene permisos, mostrar pantalla de acceso denegado mientras redirige
+  if (!isAdmin && !isManager) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <div className="bg-error/10 rounded-full p-6">
+          <Lock className="w-12 h-12 text-error" />
+        </div>
+        <h2 className="text-xl font-bold text-error">Acceso Denegado</h2>
+        <p className="text-base-content/60 text-center max-w-md">
+          No tienes permisos para acceder a la gestión de usuarios.
+          <br />
+          Necesitas rol de <strong>Administrador</strong> o <strong>Gerente</strong>.
+        </p>
+        <button
+          className="btn btn-primary"
+          onClick={() => navigate("/dashboard")}
+        >
+          Volver al Dashboard
+        </button>
+      </div>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // RESTRICCIONES ADICIONALES POR ROL
+  // ADMIN: puede hacer todo (crear, editar, eliminar, etc.)
+  // MANAGER: solo puede VER la lista de usuarios
+  // ═══════════════════════════════════════════════════════
+  const canCreate = isAdmin;
+  const canEdit = isAdmin;
+  const canDelete = isAdmin;
+  const canChangePassword = isAdmin;
+  const canToggleStatus = isAdmin;
+
   // ─── State ───
   const [users, setUsers] = useState<UserResponse[]>([]);
   const [branches, setBranches] = useState<BranchResponse[]>([]);
@@ -154,13 +203,12 @@ export default function Usuarios() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // ─── Password field state (controlled) ───
+  // ─── Password field state ───
   const [createPassword, setCreatePassword] = useState("");
   const [createConfirmPassword, setCreateConfirmPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
 
-  // ─── Reset helpers ───
   const resetCreateForm = () => {
     setCreatePassword("");
     setCreateConfirmPassword("");
@@ -201,18 +249,15 @@ export default function Usuarios() {
       u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       u.branchName.toLowerCase().includes(searchTerm.toLowerCase());
-
     const matchesRole = filterRole === "ALL" || u.role === filterRole;
-
     const matchesStatus =
       filterStatus === "ALL" ||
       (filterStatus === "ACTIVE" && u.active) ||
       (filterStatus === "INACTIVE" && !u.active);
-
     return matchesSearch && matchesRole && matchesStatus;
   });
 
-  // ─── Create user ───
+  // ─── Handlers (sin cambios en la lógica) ───
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSubmitting(true);
@@ -223,7 +268,6 @@ export default function Usuarios() {
       setSubmitting(false);
       return;
     }
-
     if (createPassword.length < 6) {
       setFormError("La contraseña debe tener al menos 6 caracteres");
       setSubmitting(false);
@@ -231,7 +275,6 @@ export default function Usuarios() {
     }
 
     const fd = new FormData(e.currentTarget);
-
     const request: CreateUserRequest = {
       name: fd.get("name") as string,
       email: fd.get("email") as string,
@@ -243,30 +286,24 @@ export default function Usuarios() {
     try {
       const newUser = await createUser(request);
       setUsers((prev) => [...prev, newUser]);
-      // ✅ Usar ref en vez de e.currentTarget (que puede ser null después del await)
       createFormRef.current?.reset();
       resetCreateForm();
       createModalRef.current?.close();
       showToast("success", `Usuario "${newUser.name}" creado exitosamente`);
     } catch {
-      setFormError(
-        "No se pudo crear el usuario. Verifica los datos e intenta de nuevo."
-      );
+      setFormError("No se pudo crear el usuario. Verifica los datos.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ─── Update user ───
   const handleUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingUser) return;
-
     setSubmitting(true);
     setFormError(null);
 
     const fd = new FormData(e.currentTarget);
-
     const request: UpdateUserRequest = {
       name: fd.get("name") as string,
       branchId: Number(fd.get("branchId")),
@@ -280,25 +317,19 @@ export default function Usuarios() {
       );
       editModalRef.current?.close();
       setEditingUser(null);
-      showToast(
-        "success",
-        `Usuario "${updated.name}" actualizado exitosamente`
-      );
-    } catch (err: any) {
-      setFormError("No se pudo actualizar el usuario. Intenta de nuevo.");
+      showToast("success", `Usuario "${updated.name}" actualizado`);
+    } catch {
+      setFormError("No se pudo actualizar el usuario.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ─── Toggle status ───
   const handleToggleStatus = async () => {
     if (!confirmAction) return;
     setSubmitting(true);
-
     try {
       const { user, action } = confirmAction;
-
       if (action === "deactivate") {
         await deactivateUser(user.publicId);
         setUsers((prev) =>
@@ -314,21 +345,18 @@ export default function Usuarios() {
         );
         showToast("success", `Usuario "${user.name}" activado`);
       }
-
       confirmModalRef.current?.close();
       setConfirmAction(null);
-    } catch (err: any) {
+    } catch {
       showToast("error", "No se pudo cambiar el estado del usuario");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ─── Change password ───
   const handleChangePassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!passwordUser) return;
-
     setSubmitting(true);
     setFormError(null);
 
@@ -337,7 +365,6 @@ export default function Usuarios() {
       setSubmitting(false);
       return;
     }
-
     if (newPassword.length < 6) {
       setFormError("La contraseña debe tener al menos 6 caracteres");
       setSubmitting(false);
@@ -350,18 +377,16 @@ export default function Usuarios() {
       setPasswordUser(null);
       resetPasswordForm();
       showToast("success", "Contraseña actualizada exitosamente");
-    } catch (err: any) {
-      setFormError("No se pudo cambiar la contraseña. Intenta de nuevo.");
+    } catch {
+      setFormError("No se pudo cambiar la contraseña.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ─── Delete user ───
   const handleDelete = async () => {
     if (!deletingUser) return;
     setSubmitting(true);
-
     try {
       await deleteUser(deletingUser.publicId);
       setUsers((prev) =>
@@ -370,7 +395,7 @@ export default function Usuarios() {
       deleteModalRef.current?.close();
       showToast("success", `Usuario "${deletingUser.name}" eliminado`);
       setDeletingUser(null);
-    } catch (err: any) {
+    } catch {
       showToast("error", "No se pudo eliminar el usuario");
     } finally {
       setSubmitting(false);
@@ -382,19 +407,16 @@ export default function Usuarios() {
     resetCreateForm();
     createModalRef.current?.showModal();
   };
-
   const openEdit = (user: UserResponse) => {
     setEditingUser(user);
     setFormError(null);
     editModalRef.current?.showModal();
   };
-
   const openPasswordChange = (user: UserResponse) => {
     setPasswordUser(user);
     resetPasswordForm();
     passwordModalRef.current?.showModal();
   };
-
   const openConfirmToggle = (user: UserResponse) => {
     setConfirmAction({
       user,
@@ -402,7 +424,6 @@ export default function Usuarios() {
     });
     confirmModalRef.current?.showModal();
   };
-
   const openDelete = (user: UserResponse) => {
     setDeletingUser(user);
     deleteModalRef.current?.showModal();
@@ -414,7 +435,6 @@ export default function Usuarios() {
   const inactiveUsers = totalUsers - activeUsers;
   const adminCount = users.filter((u) => u.role === "ADMIN").length;
 
-  // ─── Render ───
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -438,7 +458,7 @@ export default function Usuarios() {
 
   return (
     <div className="space-y-6">
-      {/* ═══ Toast notifications ═══ */}
+      {/* Toast notifications */}
       <div className="toast toast-top toast-end z-[100]">
         {toasts.map((toast) => (
           <div
@@ -456,25 +476,30 @@ export default function Usuarios() {
         ))}
       </div>
 
-      {/* ═══ Header ═══ */}
+      {/* ═══ Header — botón "Nuevo" solo para ADMIN ═══ */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold">Gestión de Usuarios</h2>
           <p className="text-base-content/60 text-sm mt-1">
-            Administra los usuarios de tu negocio
+            {isAdmin
+              ? "Administra los usuarios de tu negocio"
+              : "Vista de usuarios de tu negocio (solo lectura)"}
           </p>
         </div>
         <div className="flex gap-2">
           <button className="btn btn-ghost btn-sm gap-2" onClick={loadData}>
             <RefreshCw className="w-4 h-4" /> Actualizar
           </button>
-          <button className="btn btn-primary gap-2" onClick={openCreate}>
-            <UserPlus className="w-4 h-4" /> Nuevo Usuario
-          </button>
+          {/* ═══ Solo ADMIN puede crear ═══ */}
+          {canCreate && (
+            <button className="btn btn-primary gap-2" onClick={openCreate}>
+              <UserPlus className="w-4 h-4" /> Nuevo Usuario
+            </button>
+          )}
         </div>
       </div>
 
-      {/* ═══ Stats ═══ */}
+      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="stat bg-base-100 shadow-sm rounded-box p-4">
           <div className="stat-title text-xs">Total</div>
@@ -494,7 +519,7 @@ export default function Usuarios() {
         </div>
       </div>
 
-      {/* ═══ Filters ═══ */}
+      {/* Filters */}
       <div className="card bg-base-100 shadow-sm">
         <div className="card-body py-4">
           <div className="flex flex-col sm:flex-row gap-3">
@@ -539,7 +564,7 @@ export default function Usuarios() {
         </div>
       </div>
 
-      {/* ═══ Table ═══ */}
+      {/* ═══ Table — acciones condicionadas por rol ═══ */}
       <div className="card bg-base-100 shadow-sm">
         <div className="card-body">
           {filteredUsers.length === 0 ? (
@@ -547,7 +572,8 @@ export default function Usuarios() {
               <User className="w-12 h-12 mx-auto mb-3 opacity-30" />
               <p className="text-lg">No se encontraron usuarios</p>
               <p className="text-sm">
-                Intenta cambiar los filtros o crea un nuevo usuario
+                Intenta cambiar los filtros
+                {canCreate && " o crea un nuevo usuario"}
               </p>
             </div>
           ) : (
@@ -561,7 +587,8 @@ export default function Usuarios() {
                     <th>Sucursal</th>
                     <th>Estado</th>
                     <th>Creado</th>
-                    <th className="text-right">Acciones</th>
+                    {/* Solo mostrar columna de acciones si ADMIN */}
+                    {isAdmin && <th className="text-right">Acciones</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -625,42 +652,56 @@ export default function Usuarios() {
                             day: "numeric",
                           })}
                         </td>
-                        <td className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <button
-                              className="btn btn-ghost btn-xs btn-square tooltip"
-                              data-tip="Editar"
-                              onClick={() => openEdit(u)}
-                            >
-                              <Pencil className="w-4 h-4 text-warning" />
-                            </button>
-                            <button
-                              className="btn btn-ghost btn-xs btn-square tooltip"
-                              data-tip="Cambiar contraseña"
-                              onClick={() => openPasswordChange(u)}
-                            >
-                              <KeyRound className="w-4 h-4 text-info" />
-                            </button>
-                            <button
-                              className="btn btn-ghost btn-xs btn-square tooltip"
-                              data-tip={u.active ? "Desactivar" : "Activar"}
-                              onClick={() => openConfirmToggle(u)}
-                            >
-                              {u.active ? (
-                                <UserX className="w-4 h-4 text-error" />
-                              ) : (
-                                <UserCheck className="w-4 h-4 text-success" />
+
+                        {/* ═══ ACCIONES SOLO PARA ADMIN ═══ */}
+                        {isAdmin && (
+                          <td className="text-right">
+                            <div className="flex justify-end gap-1">
+                              {canEdit && (
+                                <button
+                                  className="btn btn-ghost btn-xs btn-square tooltip"
+                                  data-tip="Editar"
+                                  onClick={() => openEdit(u)}
+                                >
+                                  <Pencil className="w-4 h-4 text-warning" />
+                                </button>
                               )}
-                            </button>
-                            <button
-                              className="btn btn-ghost btn-xs btn-square tooltip"
-                              data-tip="Eliminar"
-                              onClick={() => openDelete(u)}
-                            >
-                              <Trash2 className="w-4 h-4 text-error" />
-                            </button>
-                          </div>
-                        </td>
+                              {canChangePassword && (
+                                <button
+                                  className="btn btn-ghost btn-xs btn-square tooltip"
+                                  data-tip="Cambiar contraseña"
+                                  onClick={() => openPasswordChange(u)}
+                                >
+                                  <KeyRound className="w-4 h-4 text-info" />
+                                </button>
+                              )}
+                              {canToggleStatus && (
+                                <button
+                                  className="btn btn-ghost btn-xs btn-square tooltip"
+                                  data-tip={
+                                    u.active ? "Desactivar" : "Activar"
+                                  }
+                                  onClick={() => openConfirmToggle(u)}
+                                >
+                                  {u.active ? (
+                                    <UserX className="w-4 h-4 text-error" />
+                                  ) : (
+                                    <UserCheck className="w-4 h-4 text-success" />
+                                  )}
+                                </button>
+                              )}
+                              {canDelete && (
+                                <button
+                                  className="btn btn-ghost btn-xs btn-square tooltip"
+                                  data-tip="Eliminar"
+                                  onClick={() => openDelete(u)}
+                                >
+                                  <Trash2 className="w-4 h-4 text-error" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
@@ -677,482 +718,299 @@ export default function Usuarios() {
         </div>
       </div>
 
-      {/* ═══ MODAL: CREAR USUARIO ═══ */}
-      <dialog ref={createModalRef} className="modal">
-        <div className="modal-box max-w-lg">
-          <form method="dialog">
-            <button className="btn btn-sm btn-circle btn-ghost absolute right-4 top-4">
-              ✕
-            </button>
-          </form>
-
-          <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
-            <UserPlus className="w-5 h-5 text-primary" />
-            Nuevo Usuario
-          </h3>
-
-          {formError && (
-            <div className="alert alert-error mb-4">
-              <AlertCircle className="w-4 h-4" />
-              <span>{formError}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleCreate} className="space-y-4">
-            <label className="form-control w-full">
-              <div className="label">
-                <span className="label-text">Nombre completo</span>
-              </div>
-              <input
-                name="name"
-                type="text"
-                placeholder="Ej: Juan Pérez"
-                className="input input-bordered w-full"
-                required
-              />
-            </label>
-
-            <label className="form-control w-full">
-              <div className="label">
-                <span className="label-text">Email</span>
-              </div>
-              <input
-                name="email"
-                type="email"
-                placeholder="usuario@ejemplo.com"
-                className="input input-bordered w-full"
-                required
-              />
-            </label>
-
-            <div className="grid grid-cols-2 gap-4">
-              <label className="form-control w-full">
-                <div className="label">
-                  <span className="label-text">Rol</span>
-                </div>
-                <select
-                  name="role"
-                  className="select select-bordered w-full"
-                  required
-                >
-                  <option value="">Selecciona...</option>
-                  {Object.entries(ROLE_LABELS).map(([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="form-control w-full">
-                <div className="label">
-                  <span className="label-text">Sucursal</span>
-                </div>
-                <select
-                  name="branchId"
-                  className="select select-bordered w-full"
-                  required
-                >
-                  <option value="">Selecciona...</option>
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <div className="form-control w-full">
-              <div className="label">
-                <span className="label-text">Contraseña</span>
-              </div>
-              <PasswordInput
-                name="password"
-                placeholder="Mínimo 6 caracteres"
-                value={createPassword}
-                onChange={setCreatePassword}
-              />
-            </div>
-
-            <div className="form-control w-full">
-              <div className="label">
-                <span className="label-text">Confirmar contraseña</span>
-              </div>
-              <PasswordInput
-                name="confirmPassword"
-                placeholder="Repite la contraseña"
-                value={createConfirmPassword}
-                onChange={setCreateConfirmPassword}
-              />
-            </div>
-
-            <div className="modal-action">
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => {
-                  createModalRef.current?.close();
-                  createFormRef.current?.reset();
-                  resetCreateForm();
-                }}
-                disabled={submitting}
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={submitting}
-              >
-                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                Crear usuario
-              </button>
-            </div>
-          </form>
-        </div>
-        <form method="dialog" className="modal-backdrop">
-          <button>close</button>
-        </form>
-      </dialog>
-
-      {/* ═══ MODAL: EDITAR USUARIO ═══ */}
-      <dialog ref={editModalRef} className="modal">
-        <div className="modal-box max-w-lg">
-          <form method="dialog">
-            <button className="btn btn-sm btn-circle btn-ghost absolute right-4 top-4">
-              ✕
-            </button>
-          </form>
-
-          <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
-            <Pencil className="w-5 h-5 text-warning" />
-            Editar Usuario
-          </h3>
-
-          {formError && (
-            <div className="alert alert-error mb-4">
-              <AlertCircle className="w-4 h-4" />
-              <span>{formError}</span>
-            </div>
-          )}
-
-          {editingUser && (
-            <form onSubmit={handleUpdate} className="space-y-4">
-              <label className="form-control w-full">
-                <div className="label">
-                  <span className="label-text">Nombre completo</span>
-                </div>
-                <input
-                  name="name"
-                  type="text"
-                  className="input input-bordered w-full"
-                  defaultValue={editingUser.name}
-                  required
-                />
-              </label>
-
-              <div className="form-control w-full">
-                <div className="label">
-                  <span className="label-text">Email</span>
-                </div>
-                <input
-                  type="email"
-                  className="input input-bordered w-full input-disabled"
-                  value={editingUser.email}
-                  disabled
-                />
-                <div className="label">
-                  <span className="label-text-alt text-base-content/50">
-                    El email no se puede modificar
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <label className="form-control w-full">
-                  <div className="label">
-                    <span className="label-text">Rol</span>
-                  </div>
-                  <select
-                    name="role"
-                    className="select select-bordered w-full"
-                    defaultValue={editingUser.role}
-                    required
-                  >
-                    {Object.entries(ROLE_LABELS).map(([key, label]) => (
-                      <option key={key} value={key}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="form-control w-full">
-                  <div className="label">
-                    <span className="label-text">Sucursal</span>
-                  </div>
-                  <select
-                    name="branchId"
-                    className="select select-bordered w-full"
-                    defaultValue={editingUser.branchId}
-                    required
-                  >
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <div className="modal-action">
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => {
-                    editModalRef.current?.close();
-                    setEditingUser(null);
-                    setFormError(null);
-                  }}
-                  disabled={submitting}
-                >
-                  Cancelar
+      {/* ═══ MODALES — Solo se renderizan si ADMIN ═══ */}
+      {isAdmin && (
+        <>
+          {/* MODAL: CREAR USUARIO */}
+          <dialog ref={createModalRef} className="modal">
+            <div className="modal-box max-w-lg">
+              <form method="dialog">
+                <button className="btn btn-sm btn-circle btn-ghost absolute right-4 top-4">
+                  ✕
                 </button>
-                <button
-                  type="submit"
-                  className="btn btn-warning"
-                  disabled={submitting}
-                >
-                  {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Guardar cambios
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-        <form method="dialog" className="modal-backdrop">
-          <button>close</button>
-        </form>
-      </dialog>
-
-      {/* ═══ MODAL: CAMBIAR CONTRASEÑA ═══ */}
-      <dialog ref={passwordModalRef} className="modal">
-        <div className="modal-box max-w-sm">
-          <form method="dialog">
-            <button className="btn btn-sm btn-circle btn-ghost absolute right-4 top-4">
-              ✕
-            </button>
-          </form>
-
-          <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
-            <KeyRound className="w-5 h-5 text-info" />
-            Cambiar Contraseña
-          </h3>
-
-          {passwordUser && (
-            <p className="text-sm text-base-content/60 mb-6">
-              Usuario: <strong>{passwordUser.name}</strong>
-            </p>
-          )}
-
-          {formError && (
-            <div className="alert alert-error mb-4">
-              <AlertCircle className="w-4 h-4" />
-              <span>{formError}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleChangePassword} className="space-y-4">
-            <div className="form-control w-full">
-              <div className="label">
-                <span className="label-text">Nueva contraseña</span>
-              </div>
-              <PasswordInput
-                name="newPassword"
-                placeholder="Mínimo 6 caracteres"
-                value={newPassword}
-                onChange={setNewPassword}
-              />
-            </div>
-
-            <div className="form-control w-full">
-              <div className="label">
-                <span className="label-text">Confirmar contraseña</span>
-              </div>
-              <PasswordInput
-                name="confirmNewPassword"
-                placeholder="Repite la contraseña"
-                value={confirmNewPassword}
-                onChange={setConfirmNewPassword}
-              />
-            </div>
-
-            <div className="modal-action">
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => {
-                  passwordModalRef.current?.close();
-                  setPasswordUser(null);
-                  resetPasswordForm();
-                }}
-                disabled={submitting}
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="btn btn-info"
-                disabled={submitting}
-              >
-                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                Cambiar contraseña
-              </button>
-            </div>
-          </form>
-        </div>
-        <form method="dialog" className="modal-backdrop">
-          <button>close</button>
-        </form>
-      </dialog>
-
-      {/* ═══ MODAL: CONFIRMAR ACTIVAR/DESACTIVAR ═══ */}
-      <dialog ref={confirmModalRef} className="modal">
-        <div className="modal-box max-w-sm">
-          <form method="dialog">
-            <button className="btn btn-sm btn-circle btn-ghost absolute right-4 top-4">
-              ✕
-            </button>
-          </form>
-
-          {confirmAction && (
-            <>
-              <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                {confirmAction.action === "deactivate" ? (
-                  <UserX className="w-5 h-5 text-error" />
-                ) : (
-                  <UserCheck className="w-5 h-5 text-success" />
-                )}
-                {confirmAction.action === "deactivate"
-                  ? "Desactivar Usuario"
-                  : "Activar Usuario"}
+              </form>
+              <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-primary" />
+                Nuevo Usuario
               </h3>
-
-              <p className="text-base-content/70">
-                ¿Estás seguro de que deseas{" "}
-                <strong>
-                  {confirmAction.action === "deactivate"
-                    ? "desactivar"
-                    : "activar"}
-                </strong>{" "}
-                al usuario <strong>{confirmAction.user.name}</strong>?
-              </p>
-
-              {confirmAction.action === "deactivate" && (
-                <div className="alert alert-warning mt-4">
+              {formError && (
+                <div className="alert alert-error mb-4">
                   <AlertCircle className="w-4 h-4" />
-                  <span className="text-sm">
-                    El usuario no podrá iniciar sesión mientras esté
-                    desactivado.
-                  </span>
+                  <span>{formError}</span>
                 </div>
               )}
-
-              <div className="modal-action">
-                <button
-                  className="btn btn-ghost"
-                  onClick={() => {
-                    confirmModalRef.current?.close();
-                    setConfirmAction(null);
-                  }}
-                  disabled={submitting}
-                >
-                  Cancelar
-                </button>
-                <button
-                  className={`btn ${confirmAction.action === "deactivate"
-                    ? "btn-error"
-                    : "btn-success"
-                    }`}
-                  onClick={handleToggleStatus}
-                  disabled={submitting}
-                >
-                  {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {confirmAction.action === "deactivate"
-                    ? "Desactivar"
-                    : "Activar"}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-        <form method="dialog" className="modal-backdrop">
-          <button>close</button>
-        </form>
-      </dialog>
-
-      {/* ═══ MODAL: CONFIRMAR ELIMINAR ═══ */}
-      <dialog ref={deleteModalRef} className="modal">
-        <div className="modal-box max-w-sm">
-          <form method="dialog">
-            <button className="btn btn-sm btn-circle btn-ghost absolute right-4 top-4">
-              ✕
-            </button>
-          </form>
-
-          {deletingUser && (
-            <>
-              <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                <Trash2 className="w-5 h-5 text-error" />
-                Eliminar Usuario
-              </h3>
-
-              <p className="text-base-content/70">
-                ¿Estás seguro de que deseas eliminar permanentemente al usuario{" "}
-                <strong>{deletingUser.name}</strong>?
-              </p>
-
-              <div className="alert alert-error mt-4">
-                <AlertCircle className="w-4 h-4" />
-                <div>
-                  <p className="text-sm font-semibold">
-                    Esta acción no se puede deshacer
-                  </p>
-                  <p className="text-xs">
-                    Se eliminarán todos los datos asociados a este usuario.
-                  </p>
+              <form ref={createFormRef} onSubmit={handleCreate} className="space-y-4">
+                <label className="form-control w-full">
+                  <div className="label">
+                    <span className="label-text">Nombre completo</span>
+                  </div>
+                  <input
+                    name="name"
+                    type="text"
+                    placeholder="Ej: Juan Pérez"
+                    className="input input-bordered w-full"
+                    required
+                  />
+                </label>
+                <label className="form-control w-full">
+                  <div className="label">
+                    <span className="label-text">Email</span>
+                  </div>
+                  <input
+                    name="email"
+                    type="email"
+                    placeholder="usuario@ejemplo.com"
+                    className="input input-bordered w-full"
+                    required
+                  />
+                </label>
+                <div className="grid grid-cols-2 gap-4">
+                  <label className="form-control w-full">
+                    <div className="label">
+                      <span className="label-text">Rol</span>
+                    </div>
+                    <select name="role" className="select select-bordered w-full" required>
+                      <option value="">Selecciona...</option>
+                      {Object.entries(ROLE_LABELS).map(([key, label]) => (
+                        <option key={key} value={key}>{label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="form-control w-full">
+                    <div className="label">
+                      <span className="label-text">Sucursal</span>
+                    </div>
+                    <select name="branchId" className="select select-bordered w-full" required>
+                      <option value="">Selecciona...</option>
+                      {branches.map((b) => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
-              </div>
+                <div className="form-control w-full">
+                  <div className="label">
+                    <span className="label-text">Contraseña</span>
+                  </div>
+                  <PasswordInput
+                    name="password"
+                    placeholder="Mínimo 6 caracteres"
+                    value={createPassword}
+                    onChange={setCreatePassword}
+                  />
+                </div>
+                <div className="form-control w-full">
+                  <div className="label">
+                    <span className="label-text">Confirmar contraseña</span>
+                  </div>
+                  <PasswordInput
+                    name="confirmPassword"
+                    placeholder="Repite la contraseña"
+                    value={createConfirmPassword}
+                    onChange={setCreateConfirmPassword}
+                  />
+                </div>
+                <div className="modal-action">
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => {
+                      createModalRef.current?.close();
+                      createFormRef.current?.reset();
+                      resetCreateForm();
+                    }}
+                    disabled={submitting}
+                  >
+                    Cancelar
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={submitting}>
+                    {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Crear usuario
+                  </button>
+                </div>
+              </form>
+            </div>
+            <form method="dialog" className="modal-backdrop">
+              <button>close</button>
+            </form>
+          </dialog>
 
-              <div className="modal-action">
-                <button
-                  className="btn btn-ghost"
-                  onClick={() => {
-                    deleteModalRef.current?.close();
-                    setDeletingUser(null);
-                  }}
-                  disabled={submitting}
-                >
-                  Cancelar
-                </button>
-                <button
-                  className="btn btn-error"
-                  onClick={handleDelete}
-                  disabled={submitting}
-                >
-                  {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Eliminar
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-        <form method="dialog" className="modal-backdrop">
-          <button>close</button>
-        </form>
-      </dialog>
+          {/* MODAL: EDITAR USUARIO */}
+          <dialog ref={editModalRef} className="modal">
+            <div className="modal-box max-w-lg">
+              <form method="dialog">
+                <button className="btn btn-sm btn-circle btn-ghost absolute right-4 top-4">✕</button>
+              </form>
+              <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
+                <Pencil className="w-5 h-5 text-warning" />
+                Editar Usuario
+              </h3>
+              {formError && (
+                <div className="alert alert-error mb-4">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>{formError}</span>
+                </div>
+              )}
+              {editingUser && (
+                <form onSubmit={handleUpdate} className="space-y-4">
+                  <label className="form-control w-full">
+                    <div className="label"><span className="label-text">Nombre completo</span></div>
+                    <input name="name" type="text" className="input input-bordered w-full" defaultValue={editingUser.name} required />
+                  </label>
+                  <div className="form-control w-full">
+                    <div className="label"><span className="label-text">Email</span></div>
+                    <input type="email" className="input input-bordered w-full input-disabled" value={editingUser.email} disabled />
+                    <div className="label">
+                      <span className="label-text-alt text-base-content/50">El email no se puede modificar</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <label className="form-control w-full">
+                      <div className="label"><span className="label-text">Rol</span></div>
+                      <select name="role" className="select select-bordered w-full" defaultValue={editingUser.role} required>
+                        {Object.entries(ROLE_LABELS).map(([key, label]) => (
+                          <option key={key} value={key}>{label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="form-control w-full">
+                      <div className="label"><span className="label-text">Sucursal</span></div>
+                      <select name="branchId" className="select select-bordered w-full" defaultValue={editingUser.branchId} required>
+                        {branches.map((b) => (
+                          <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  <div className="modal-action">
+                    <button type="button" className="btn btn-ghost" onClick={() => { editModalRef.current?.close(); setEditingUser(null); setFormError(null); }} disabled={submitting}>Cancelar</button>
+                    <button type="submit" className="btn btn-warning" disabled={submitting}>
+                      {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                      Guardar cambios
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+            <form method="dialog" className="modal-backdrop"><button>close</button></form>
+          </dialog>
+
+          {/* MODAL: CAMBIAR CONTRASEÑA */}
+          <dialog ref={passwordModalRef} className="modal">
+            <div className="modal-box max-w-sm">
+              <form method="dialog">
+                <button className="btn btn-sm btn-circle btn-ghost absolute right-4 top-4">✕</button>
+              </form>
+              <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
+                <KeyRound className="w-5 h-5 text-info" />
+                Cambiar Contraseña
+              </h3>
+              {passwordUser && (
+                <p className="text-sm text-base-content/60 mb-6">
+                  Usuario: <strong>{passwordUser.name}</strong>
+                </p>
+              )}
+              {formError && (
+                <div className="alert alert-error mb-4">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>{formError}</span>
+                </div>
+              )}
+              <form onSubmit={handleChangePassword} className="space-y-4">
+                <div className="form-control w-full">
+                  <div className="label"><span className="label-text">Nueva contraseña</span></div>
+                  <PasswordInput name="newPassword" placeholder="Mínimo 6 caracteres" value={newPassword} onChange={setNewPassword} />
+                </div>
+                <div className="form-control w-full">
+                  <div className="label"><span className="label-text">Confirmar contraseña</span></div>
+                  <PasswordInput name="confirmNewPassword" placeholder="Repite la contraseña" value={confirmNewPassword} onChange={setConfirmNewPassword} />
+                </div>
+                <div className="modal-action">
+                  <button type="button" className="btn btn-ghost" onClick={() => { passwordModalRef.current?.close(); setPasswordUser(null); resetPasswordForm(); }} disabled={submitting}>Cancelar</button>
+                  <button type="submit" className="btn btn-info" disabled={submitting}>
+                    {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Cambiar contraseña
+                  </button>
+                </div>
+              </form>
+            </div>
+            <form method="dialog" className="modal-backdrop"><button>close</button></form>
+          </dialog>
+
+          {/* MODAL: CONFIRMAR ACTIVAR/DESACTIVAR */}
+          <dialog ref={confirmModalRef} className="modal">
+            <div className="modal-box max-w-sm">
+              <form method="dialog">
+                <button className="btn btn-sm btn-circle btn-ghost absolute right-4 top-4">✕</button>
+              </form>
+              {confirmAction && (
+                <>
+                  <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                    {confirmAction.action === "deactivate" ? (
+                      <UserX className="w-5 h-5 text-error" />
+                    ) : (
+                      <UserCheck className="w-5 h-5 text-success" />
+                    )}
+                    {confirmAction.action === "deactivate" ? "Desactivar Usuario" : "Activar Usuario"}
+                  </h3>
+                  <p className="text-base-content/70">
+                    ¿Estás seguro de que deseas <strong>{confirmAction.action === "deactivate" ? "desactivar" : "activar"}</strong> al usuario <strong>{confirmAction.user.name}</strong>?
+                  </p>
+                  {confirmAction.action === "deactivate" && (
+                    <div className="alert alert-warning mt-4">
+                      <AlertCircle className="w-4 h-4" />
+                      <span className="text-sm">El usuario no podrá iniciar sesión mientras esté desactivado.</span>
+                    </div>
+                  )}
+                  <div className="modal-action">
+                    <button className="btn btn-ghost" onClick={() => { confirmModalRef.current?.close(); setConfirmAction(null); }} disabled={submitting}>Cancelar</button>
+                    <button className={`btn ${confirmAction.action === "deactivate" ? "btn-error" : "btn-success"}`} onClick={handleToggleStatus} disabled={submitting}>
+                      {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {confirmAction.action === "deactivate" ? "Desactivar" : "Activar"}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+            <form method="dialog" className="modal-backdrop"><button>close</button></form>
+          </dialog>
+
+          {/* MODAL: CONFIRMAR ELIMINAR */}
+          <dialog ref={deleteModalRef} className="modal">
+            <div className="modal-box max-w-sm">
+              <form method="dialog">
+                <button className="btn btn-sm btn-circle btn-ghost absolute right-4 top-4">✕</button>
+              </form>
+              {deletingUser && (
+                <>
+                  <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                    <Trash2 className="w-5 h-5 text-error" />
+                    Eliminar Usuario
+                  </h3>
+                  <p className="text-base-content/70">
+                    ¿Estás seguro de que deseas eliminar permanentemente al usuario <strong>{deletingUser.name}</strong>?
+                  </p>
+                  <div className="alert alert-error mt-4">
+                    <AlertCircle className="w-4 h-4" />
+                    <div>
+                      <p className="text-sm font-semibold">Esta acción no se puede deshacer</p>
+                      <p className="text-xs">Se eliminarán todos los datos asociados a este usuario.</p>
+                    </div>
+                  </div>
+                  <div className="modal-action">
+                    <button className="btn btn-ghost" onClick={() => { deleteModalRef.current?.close(); setDeletingUser(null); }} disabled={submitting}>Cancelar</button>
+                    <button className="btn btn-error" onClick={handleDelete} disabled={submitting}>
+                      {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                      Eliminar
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+            <form method="dialog" className="modal-backdrop"><button>close</button></form>
+          </dialog>
+        </>
+      )}
     </div>
   );
 }

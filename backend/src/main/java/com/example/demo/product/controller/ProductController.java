@@ -53,4 +53,11 @@ public class ProductController {
     public void delete(@PathVariable String publicId) {
         productService.delete(publicId);
     }
+
+    // 👑 ADMIN y MANAGER pueden activar/desactivar
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PatchMapping("/{publicId}/toggle-status")
+    public ProductResponse toggleStatus(@PathVariable String publicId) {
+        return productService.toggleStatus(publicId);
+    }
 }

@@ -42,12 +42,12 @@ public class ProductService {
         return mapToResponse(product);
     }
 
-    // 🔹 FIND ALL
+    // 🔹 FIND ALL (activos e inactivos)
     public List<ProductResponse> findAll() {
 
         Long tenantId = TenantContext.getTenantId();
 
-        return productRepository.findAllByTenant_IdAndActiveTrue(tenantId)
+        return productRepository.findAllByTenant_Id(tenantId)
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
@@ -113,5 +113,22 @@ public class ProductService {
         response.setUpdatedAt(product.getUpdatedAt());
 
         return response;
+    }
+
+    // 🔹 TOGGLE STATUS (activar/desactivar)
+    public ProductResponse toggleStatus(String publicId) {
+
+        Long tenantId = TenantContext.getTenantId();
+
+        // Buscar incluyendo inactivos (sin filtro de active)
+        Product product = productRepository
+                .findByPublicIdAndTenant_Id(publicId, tenantId)
+                .orElseThrow(() -> new EntityNotFoundException("Product not found"));
+
+        // Invertir el estado
+        product.setActive(!product.getActive());
+        productRepository.save(product);
+
+        return mapToResponse(product);
     }
 }

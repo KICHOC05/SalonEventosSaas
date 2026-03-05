@@ -18,14 +18,27 @@ import {
 } from "lucide-react";
 import { useAuth } from "~/lib/auth";
 
-/* ── Navegación del sidebar ── */
-const NAV_ITEMS = [
+/* ── Tipo para items de navegación ── */
+interface NavItem {
+  to: string;
+  icon: typeof BarChart3;
+  label: string;
+  roles?: string[]; // Si no se define, todos pueden ver
+}
+
+/* ── Navegación del sidebar con roles ── */
+const NAV_ITEMS: NavItem[] = [
   { to: "/dashboard", icon: BarChart3, label: "Dashboard" },
   { to: "/dashboard/eventos", icon: Calendar, label: "Gestión de Eventos" },
   { to: "/dashboard/inventario", icon: UtensilsCrossed, label: "Inventario de Menús" },
   { to: "/dashboard/pos", icon: Receipt, label: "Punto de Venta" },
   { to: "/dashboard/estadisticas", icon: PieChart, label: "Estadísticas" },
-  { to: "/dashboard/usuarios", icon: Users, label: "Usuarios" },
+  {
+    to: "/dashboard/usuarios",
+    icon: Users,
+    label: "Usuarios",
+    roles: ["ADMIN", "MANAGER"], // ← Solo ADMIN y MANAGER
+  },
 ];
 
 /* ── Títulos por ruta ── */
@@ -50,7 +63,7 @@ const ROLE_LABELS: Record<string, string> = {
 export default function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAuthenticated, isLoading, logout } = useAuth();
+  const { user, role, isAuthenticated, isLoading, logout } = useAuth();
 
   const pageTitle = PAGE_TITLES[location.pathname] ?? "Space Kids";
 
@@ -73,7 +86,7 @@ export default function DashboardLayout() {
     );
   }
 
-  // Si no está autenticado, no renderizar nada (el useEffect redirige)
+  // Si no está autenticado, no renderizar nada
   if (!isAuthenticated || !user) {
     return null;
   }
@@ -82,6 +95,16 @@ export default function DashboardLayout() {
     logout();
     navigate("/dashboard/login", { replace: true });
   };
+
+  // ═══════════════════════════════════════════════════
+  // FILTRAR ITEMS DE NAVEGACIÓN SEGÚN EL ROL
+  // ═══════════════════════════════════════════════════
+  const visibleNavItems = NAV_ITEMS.filter((item) => {
+    // Si no tiene restricción de roles, todos pueden ver
+    if (!item.roles) return true;
+    // Si tiene roles definidos, verificar que el usuario tenga uno de ellos
+    return item.roles.includes(role);
+  });
 
   return (
     <div className="drawer lg:drawer-open">
@@ -168,7 +191,6 @@ export default function DashboardLayout() {
                 tabIndex={0}
                 className="dropdown-content menu bg-base-100 rounded-box w-56 p-2 shadow-lg border border-base-300 mt-2 z-50"
               >
-                {/* Info del usuario */}
                 <li className="menu-title">
                   <div className="flex flex-col">
                     <span className="font-semibold">{user.name}</span>
@@ -223,9 +245,9 @@ export default function DashboardLayout() {
             </div>
           </div>
 
-          {/* Menú */}
+          {/* ═══ MENÚ FILTRADO POR ROL ═══ */}
           <ul className="menu menu-lg flex-1 p-4 gap-1">
-            {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
+            {visibleNavItems.map(({ to, icon: Icon, label }) => (
               <li key={to}>
                 <NavLink
                   to={to}

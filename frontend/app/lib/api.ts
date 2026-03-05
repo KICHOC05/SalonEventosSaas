@@ -244,3 +244,85 @@ export async function deleteUser(publicId: string): Promise<void> {
 export async function fetchBranches(): Promise<BranchResponse[]> {
     return apiFetch<BranchResponse[]>("/branches");
 }
+
+// ─── Types para Products ───
+export interface ProductResponse {
+    publicId: string;
+    name: string;
+    description: string | null;
+    price: number;
+    stock: number | null;
+    type: "PRODUCT" | "SERVICE" | "PACKAGE";
+    active: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ProductRequest {
+    name: string;
+    description?: string;
+    price: number;
+    stock?: number;
+    type: "PRODUCT" | "SERVICE" | "PACKAGE";
+}
+
+// ─── Types para Products ───
+export type ProductType = "PRODUCT" | "SERVICE" | "PACKAGE";
+
+export interface ProductResponse {
+    publicId: string;
+    name: string;
+    description: string | null;
+    price: number;
+    stock: number | null;
+    type: ProductType;
+    active: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ProductRequest {
+    name: string;
+    description?: string;
+    price: number;
+    stock?: number;
+    type: ProductType;
+}
+
+// ─── Products API ───
+export async function fetchProducts(): Promise<ProductResponse[]> {
+    return apiFetch<ProductResponse[]>("/products");
+}
+
+export async function fetchProductByPublicId(publicId: string): Promise<ProductResponse> {
+    return apiFetch<ProductResponse>(`/products/${publicId}`);
+}
+
+export async function createProduct(data: ProductRequest): Promise<ProductResponse> {
+    return apiFetch<ProductResponse>("/products", {
+        method: "POST",
+        body: JSON.stringify(data),
+    });
+}
+
+export async function updateProduct(
+    publicId: string,
+    data: ProductRequest
+): Promise<ProductResponse> {
+    return apiFetch<ProductResponse>(`/products/${publicId}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+    });
+}
+
+export async function deleteProduct(publicId: string): Promise<void> {
+    await apiFetch<void>(`/products/${publicId}`, {
+        method: "DELETE",
+    });
+}
+
+export async function toggleProductStatus(publicId: string): Promise<ProductResponse> {
+    return apiFetch<ProductResponse>(`/products/${publicId}/toggle-status`, {
+        method: "PATCH",
+    });
+}

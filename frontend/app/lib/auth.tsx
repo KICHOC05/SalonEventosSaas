@@ -18,10 +18,17 @@ import {
 
 interface AuthContextType {
     user: AuthUser | null;
+    role: string;
     isAuthenticated: boolean;
     isLoading: boolean;
     login: (data: LoginRequest) => Promise<void>;
     logout: () => void;
+    // Helpers de roles
+    isAdmin: boolean;
+    isManager: boolean;
+    isCashier: boolean;
+    isEmployee: boolean;
+    canManageProducts: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -61,14 +68,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
     }, []);
 
+    const role = user?.role || "";
+
     return (
         <AuthContext.Provider
             value={{
                 user,
+                role,
                 isAuthenticated: !!user,
                 isLoading,
                 login,
                 logout,
+                // Helpers de roles
+                isAdmin: role === "ADMIN",
+                isManager: role === "MANAGER",
+                isCashier: role === "CASHIER",
+                isEmployee: role === "EMPLOYEE",
+                canManageProducts: role === "ADMIN" || role === "MANAGER",
             }}
         >
             {children}

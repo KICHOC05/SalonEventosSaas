@@ -7,11 +7,14 @@ import {
     TrendingUp,
     Package,
     ArrowUp,
+    Users,
+    ShieldCheck,
 } from "lucide-react";
 import { Line, Doughnut } from "react-chartjs-2";
 import "~/lib/chartSetup";
 import { darkGridOptions, darkDoughnutOptions } from "~/lib/chartSetup";
 import { events } from "~/data/mockData";
+import { useAuth } from "~/lib/auth"; // ← IMPORTAR
 
 /* ── Tarjeta de estadística ── */
 function StatCard({
@@ -68,6 +71,14 @@ export default function Dashboard() {
     const [isClient, setIsClient] = useState(false);
     useEffect(() => setIsClient(true), []);
 
+    // ═══════════════════════════════════════════
+    // OBTENER ROL DEL USUARIO AUTENTICADO
+    // ═══════════════════════════════════════════
+    const { user, role, isAdmin, isManager } = useAuth();
+
+    // Solo ADMIN y MANAGER pueden ver la sección de usuarios
+    const canViewUsers = isAdmin || isManager;
+
     const salesData = {
         labels: ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"],
         datasets: [
@@ -96,6 +107,28 @@ export default function Dashboard() {
 
     return (
         <div className="space-y-6">
+            {/* ═══════════════════════════════════════
+                SALUDO CON ROL
+            ═══════════════════════════════════════ */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold">
+                        Bienvenido, {user?.name || "Usuario"}
+                    </h1>
+                    <div className="flex items-center gap-2 mt-1">
+                        <ShieldCheck className="w-4 h-4 text-primary" />
+                        <span className="text-sm text-base-content/60">
+                            Rol: <span className="badge badge-sm badge-primary">{role}</span>
+                        </span>
+                        {user?.branchName && (
+                            <span className="text-sm text-base-content/60">
+                                • Sucursal: {user.branchName}
+                            </span>
+                        )}
+                    </div>
+                </div>
+            </div>
+
             {/* Tarjetas de estadísticas */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
                 <StatCard
@@ -107,7 +140,8 @@ export default function Dashboard() {
                     delay={100}
                     footer={
                         <span className="text-success flex items-center gap-1">
-                            <ArrowUp className="w-3 h-3" /> 12% <span className="text-base-content/50">vs. ayer</span>
+                            <ArrowUp className="w-3 h-3" /> 12%{" "}
+                            <span className="text-base-content/50">vs. ayer</span>
                         </span>
                     }
                 />
@@ -129,7 +163,8 @@ export default function Dashboard() {
                     delay={300}
                     footer={
                         <span className="text-success flex items-center gap-1">
-                            <ArrowUp className="w-3 h-3" /> 8% <span className="text-base-content/50">vs. mes anterior</span>
+                            <ArrowUp className="w-3 h-3" /> 8%{" "}
+                            <span className="text-base-content/50">vs. mes anterior</span>
                         </span>
                     }
                 />
@@ -150,7 +185,9 @@ export default function Dashboard() {
                     <div className="card-body">
                         <h3 className="card-title text-base">Ventas de la semana</h3>
                         <div className="chart-container">
-                            {isClient && <Line data={salesData} options={darkGridOptions as any} />}
+                            {isClient && (
+                                <Line data={salesData} options={darkGridOptions as any} />
+                            )}
                         </div>
                     </div>
                 </div>
@@ -159,18 +196,54 @@ export default function Dashboard() {
                     <div className="card-body">
                         <h3 className="card-title text-base">Paquetes más vendidos</h3>
                         <div className="chart-container">
-                            {isClient && <Doughnut data={packagesData} options={darkDoughnutOptions as any} />}
+                            {isClient && (
+                                <Doughnut
+                                    data={packagesData}
+                                    options={darkDoughnutOptions as any}
+                                />
+                            )}
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* ═══════════════════════════════════════════════════
+                SECCIÓN DE USUARIOS - SOLO ADMIN / MANAGER
+            ═══════════════════════════════════════════════════ */}
+            {canViewUsers && (
+                <div className="card bg-base-100 shadow-sm">
+                    <div className="card-body">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <Users className="w-5 h-5 text-primary" />
+                                <h3 className="card-title text-base">
+                                    Gestión de Usuarios
+                                </h3>
+                            </div>
+                            <Link
+                                to="/dashboard/usuarios"
+                                className="btn btn-primary btn-sm"
+                            >
+                                Administrar usuarios
+                            </Link>
+                        </div>
+                        <p className="text-sm text-base-content/60">
+                            {isAdmin
+                                ? "Como administrador puedes crear, editar, desactivar y eliminar usuarios."
+                                : "Como manager puedes ver la lista de usuarios de tu sucursal."}
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* Eventos próximos */}
             <div className="card bg-base-100 shadow-sm">
                 <div className="card-body">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="card-title text-base">Eventos próximos</h3>
-                        <Link to="/eventos" className="link link-primary text-sm">Ver todos</Link>
+                        <Link to="/dashboard/eventos" className="link link-primary text-sm">
+                            Ver todos
+                        </Link>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="table">
@@ -190,7 +263,9 @@ export default function Dashboard() {
                                         <td>{ev.client}</td>
                                         <td>{ev.package}</td>
                                         <td>{ev.children}</td>
-                                        <td><StatusBadge status={ev.status} /></td>
+                                        <td>
+                                            <StatusBadge status={ev.status} />
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
