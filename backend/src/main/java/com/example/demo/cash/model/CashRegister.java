@@ -1,9 +1,10 @@
-package com.example.demo.order.model;
+package com.example.demo.cash.model;
 
 import com.example.demo.branch.model.Branch;
-import com.example.demo.common.enums.OrderStatus;
+import com.example.demo.common.enums.CashStatus;
 import com.example.demo.tenant.model.Tenant;
 import com.example.demo.user.model.User;
+
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -13,10 +14,10 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "orders")
+@Table(name = "cash_registers")
 @Getter
 @Setter
-public class Order {
+public class CashRegister {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -27,8 +28,8 @@ public class Order {
 
     @PrePersist
     public void generatePublicId() {
-        if (this.publicId == null) {
-            this.publicId = UUID.randomUUID().toString();
+        if (publicId == null) {
+            publicId = UUID.randomUUID().toString();
         }
     }
 
@@ -41,28 +42,28 @@ public class Order {
     private Branch branch;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(nullable = false)
-    private User user;
+    @JoinColumn(name = "opened_by", nullable = false)
+    private User openedBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "closed_by")
+    private User closedBy;
+
+    @Column(nullable = false)
+    private BigDecimal openingAmount;
+
+    private BigDecimal closingAmount;
+
+    private BigDecimal expectedAmount;
+
+    private BigDecimal difference;
+
+    @Column(nullable = false)
+    private LocalDateTime openedAt;
+
+    private LocalDateTime closedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private OrderStatus status = OrderStatus.OPEN;
-
-    @Column(nullable = false)
-    private BigDecimal totalAmount = BigDecimal.ZERO;
-
-    @Column(nullable = false)
-    private BigDecimal subtotal = BigDecimal.ZERO;
-
-    @Column(nullable = false)
-    private BigDecimal tax = BigDecimal.ZERO;
-
-
-    private String customerName;
-    private String childName;
-
-    private LocalDateTime createdAt = LocalDateTime.now();
-    private LocalDateTime closedAt;
-
-    
+    private CashStatus status;
 }

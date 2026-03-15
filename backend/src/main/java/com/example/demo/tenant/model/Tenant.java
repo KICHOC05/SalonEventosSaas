@@ -1,5 +1,6 @@
 package com.example.demo.tenant.model;
 
+import com.example.demo.common.enums.InventoryMode;
 import com.example.demo.common.enums.TenantStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
@@ -40,4 +41,9 @@ public class Tenant {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private InventoryMode inventoryMode = InventoryMode.WARNING;
+
 }
