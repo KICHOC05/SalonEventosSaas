@@ -3,6 +3,11 @@ import { useState, useEffect } from "react";
 import { Bar, Doughnut, Line } from "react-chartjs-2";
 import "~/lib/chartSetup";
 import { darkGridOptions, darkDoughnutOptions } from "~/lib/chartSetup";
+import { buildMeta } from "~/lib/meta";
+
+export function meta() {
+  return buildMeta("Estadisticas", "Analisis y metricas de ventas y eventos");
+}
 
 export default function Estadisticas() {
   const [isClient, setIsClient] = useState(false);

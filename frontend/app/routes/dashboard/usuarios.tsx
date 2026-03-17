@@ -1,4 +1,3 @@
-// app/routes/usuarios.tsx
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -35,7 +34,12 @@ import {
   type UpdateUserRequest,
   type BranchResponse,
 } from "~/lib/api";
-import { useAuth } from "~/lib/auth"; // ← IMPORTAR
+import { useAuth } from "~/lib/auth";
+import { buildMeta } from "~/lib/meta";
+
+export function meta() {
+  return buildMeta("Usuarios", "Gestion de usuarios");
+}
 
 type UserRole = "ADMIN" | "MANAGER" | "CASHIER" | "EMPLOYEE";
 
@@ -60,7 +64,6 @@ const ROLE_ICONS: Record<UserRole, typeof Shield> = {
   EMPLOYEE: User,
 };
 
-// ─── Componente de input con toggle de visibilidad ───
 function PasswordInput({
   name,
   placeholder,
@@ -105,7 +108,6 @@ function PasswordInput({
   );
 }
 
-// ─── Toast notification ───
 type ToastType = "success" | "error";
 
 interface Toast {
@@ -115,9 +117,6 @@ interface Toast {
 }
 
 export default function Usuarios() {
-  // ═══════════════════════════════════════════════════════
-  // PROTECCIÓN DE RUTA — Solo ADMIN y MANAGER
-  // ═══════════════════════════════════════════════════════
   const { role, isAdmin, isManager } = useAuth();
   const navigate = useNavigate();
 
@@ -127,7 +126,6 @@ export default function Usuarios() {
     }
   }, [isAdmin, isManager, navigate]);
 
-  // Si no tiene permisos, mostrar pantalla de acceso denegado mientras redirige
   if (!isAdmin && !isManager) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
@@ -150,18 +148,12 @@ export default function Usuarios() {
     );
   }
 
-  // ═══════════════════════════════════════════════════════
-  // RESTRICCIONES ADICIONALES POR ROL
-  // ADMIN: puede hacer todo (crear, editar, eliminar, etc.)
-  // MANAGER: solo puede VER la lista de usuarios
-  // ═══════════════════════════════════════════════════════
   const canCreate = isAdmin;
   const canEdit = isAdmin;
   const canDelete = isAdmin;
   const canChangePassword = isAdmin;
   const canToggleStatus = isAdmin;
 
-  // ─── State ───
   const [users, setUsers] = useState<UserResponse[]>([]);
   const [branches, setBranches] = useState<BranchResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -172,7 +164,6 @@ export default function Usuarios() {
     "ALL" | "ACTIVE" | "INACTIVE"
   >("ALL");
 
-  // ─── Toasts ───
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const showToast = (type: ToastType, message: string) => {
@@ -183,7 +174,6 @@ export default function Usuarios() {
     }, 4000);
   };
 
-  // ─── Modal refs ───
   const createModalRef = useRef<HTMLDialogElement>(null);
   const createFormRef = useRef<HTMLFormElement>(null);
   const editModalRef = useRef<HTMLDialogElement>(null);
@@ -191,7 +181,6 @@ export default function Usuarios() {
   const confirmModalRef = useRef<HTMLDialogElement>(null);
   const deleteModalRef = useRef<HTMLDialogElement>(null);
 
-  // ─── Modal data state ───
   const [editingUser, setEditingUser] = useState<UserResponse | null>(null);
   const [passwordUser, setPasswordUser] = useState<UserResponse | null>(null);
   const [confirmAction, setConfirmAction] = useState<{
@@ -203,7 +192,6 @@ export default function Usuarios() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // ─── Password field state ───
   const [createPassword, setCreatePassword] = useState("");
   const [createConfirmPassword, setCreateConfirmPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -221,7 +209,6 @@ export default function Usuarios() {
     setFormError(null);
   };
 
-  // ─── Load data ───
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -243,7 +230,6 @@ export default function Usuarios() {
     loadData();
   }, [loadData]);
 
-  // ─── Filtered users ───
   const filteredUsers = users.filter((u) => {
     const matchesSearch =
       u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -257,7 +243,6 @@ export default function Usuarios() {
     return matchesSearch && matchesRole && matchesStatus;
   });
 
-  // ─── Handlers (sin cambios en la lógica) ───
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSubmitting(true);
@@ -402,7 +387,6 @@ export default function Usuarios() {
     }
   };
 
-  // ─── Open modals ───
   const openCreate = () => {
     resetCreateForm();
     createModalRef.current?.showModal();
@@ -429,7 +413,6 @@ export default function Usuarios() {
     deleteModalRef.current?.showModal();
   };
 
-  // ─── Stats ───
   const totalUsers = users.length;
   const activeUsers = users.filter((u) => u.active).length;
   const inactiveUsers = totalUsers - activeUsers;
@@ -458,7 +441,6 @@ export default function Usuarios() {
 
   return (
     <div className="space-y-6">
-      {/* Toast notifications */}
       <div className="toast toast-top toast-end z-[100]">
         {toasts.map((toast) => (
           <div
@@ -476,7 +458,6 @@ export default function Usuarios() {
         ))}
       </div>
 
-      {/* ═══ Header — botón "Nuevo" solo para ADMIN ═══ */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold">Gestión de Usuarios</h2>
@@ -490,7 +471,6 @@ export default function Usuarios() {
           <button className="btn btn-ghost btn-sm gap-2" onClick={loadData}>
             <RefreshCw className="w-4 h-4" /> Actualizar
           </button>
-          {/* ═══ Solo ADMIN puede crear ═══ */}
           {canCreate && (
             <button className="btn btn-primary gap-2" onClick={openCreate}>
               <UserPlus className="w-4 h-4" /> Nuevo Usuario
@@ -499,7 +479,6 @@ export default function Usuarios() {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="stat bg-base-100 shadow-sm rounded-box p-4">
           <div className="stat-title text-xs">Total</div>
@@ -519,7 +498,6 @@ export default function Usuarios() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="card bg-base-100 shadow-sm">
         <div className="card-body py-4">
           <div className="flex flex-col sm:flex-row gap-3">
@@ -564,7 +542,6 @@ export default function Usuarios() {
         </div>
       </div>
 
-      {/* ═══ Table — acciones condicionadas por rol ═══ */}
       <div className="card bg-base-100 shadow-sm">
         <div className="card-body">
           {filteredUsers.length === 0 ? (
@@ -587,7 +564,6 @@ export default function Usuarios() {
                     <th>Sucursal</th>
                     <th>Estado</th>
                     <th>Creado</th>
-                    {/* Solo mostrar columna de acciones si ADMIN */}
                     {isAdmin && <th className="text-right">Acciones</th>}
                   </tr>
                 </thead>
@@ -653,7 +629,6 @@ export default function Usuarios() {
                           })}
                         </td>
 
-                        {/* ═══ ACCIONES SOLO PARA ADMIN ═══ */}
                         {isAdmin && (
                           <td className="text-right">
                             <div className="flex justify-end gap-1">
@@ -718,10 +693,8 @@ export default function Usuarios() {
         </div>
       </div>
 
-      {/* ═══ MODALES — Solo se renderizan si ADMIN ═══ */}
       {isAdmin && (
         <>
-          {/* MODAL: CREAR USUARIO */}
           <dialog ref={createModalRef} className="modal">
             <div className="modal-box max-w-lg">
               <form method="dialog">
@@ -835,7 +808,6 @@ export default function Usuarios() {
             </form>
           </dialog>
 
-          {/* MODAL: EDITAR USUARIO */}
           <dialog ref={editModalRef} className="modal">
             <div className="modal-box max-w-lg">
               <form method="dialog">
@@ -895,7 +867,6 @@ export default function Usuarios() {
             <form method="dialog" className="modal-backdrop"><button>close</button></form>
           </dialog>
 
-          {/* MODAL: CAMBIAR CONTRASEÑA */}
           <dialog ref={passwordModalRef} className="modal">
             <div className="modal-box max-w-sm">
               <form method="dialog">
@@ -937,7 +908,6 @@ export default function Usuarios() {
             <form method="dialog" className="modal-backdrop"><button>close</button></form>
           </dialog>
 
-          {/* MODAL: CONFIRMAR ACTIVAR/DESACTIVAR */}
           <dialog ref={confirmModalRef} className="modal">
             <div className="modal-box max-w-sm">
               <form method="dialog">
@@ -975,7 +945,6 @@ export default function Usuarios() {
             <form method="dialog" className="modal-backdrop"><button>close</button></form>
           </dialog>
 
-          {/* MODAL: CONFIRMAR ELIMINAR */}
           <dialog ref={deleteModalRef} className="modal">
             <div className="modal-box max-w-sm">
               <form method="dialog">

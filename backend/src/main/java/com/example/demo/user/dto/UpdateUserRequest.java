@@ -1,7 +1,6 @@
 package com.example.demo.user.dto;
 
 import com.example.demo.common.enums.UserRole;
-import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 

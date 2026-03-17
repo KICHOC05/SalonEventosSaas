@@ -1,8 +1,6 @@
-// app/lib/api.ts
 
 const API_BASE = "http://localhost:8080/api";
 
-// ─── Tipos ───
 export interface LoginRequest {
     tenantPublicId: string;
     email: string;
@@ -33,7 +31,6 @@ export interface AuthUser {
     branchName: string;
 }
 
-// ─── Almacenamiento ───
 const AUTH_KEY = "pos_auth";
 
 export function getStoredAuth(): AuthUser | null {
@@ -42,7 +39,6 @@ export function getStoredAuth(): AuthUser | null {
         const raw = localStorage.getItem(AUTH_KEY);
         if (!raw) return null;
         const auth: AuthUser = JSON.parse(raw);
-        // Verificar que el token no esté expirado (decodificar JWT)
         if (isTokenExpired(auth.token)) {
             localStorage.removeItem(AUTH_KEY);
             return null;
@@ -61,7 +57,6 @@ export function clearStoredAuth(): void {
     localStorage.removeItem(AUTH_KEY);
 }
 
-// ─── Verificar expiración del JWT ───
 function isTokenExpired(token: string): boolean {
     try {
         const payload = JSON.parse(atob(token.split(".")[1]));
@@ -71,7 +66,6 @@ function isTokenExpired(token: string): boolean {
     }
 }
 
-// ─── API Fetch wrapper ───
 export async function apiFetch<T>(
     endpoint: string,
     options: RequestInit = {}
@@ -111,7 +105,6 @@ export async function apiFetch<T>(
                 errorBody = JSON.parse(text);
             }
         } catch {
-            // ignorar error de parseo
         }
         throw new ApiError(
             errorBody.error || `Error ${response.status}`,
@@ -120,15 +113,12 @@ export async function apiFetch<T>(
         );
     }
 
-    // ✅ Leer el body como texto PRIMERO
     const text = await response.text();
 
-    // ✅ Si no hay contenido, retornar vacío
     if (!text || text.trim().length === 0) {
         return {} as T;
     }
 
-    // ✅ Intentar parsear
     try {
         return JSON.parse(text) as T;
     } catch {
@@ -136,7 +126,6 @@ export async function apiFetch<T>(
     }
 }
 
-// ─── Error personalizado ───
 export class ApiError extends Error {
     status: number;
     body: any;
@@ -149,7 +138,6 @@ export class ApiError extends Error {
     }
 }
 
-// ─── Auth API ───
 export async function login(data: LoginRequest): Promise<LoginResponse> {
     return await apiFetch<LoginResponse>("/auth/login", {
         method: "POST",
@@ -157,7 +145,6 @@ export async function login(data: LoginRequest): Promise<LoginResponse> {
     });
 }
 
-// ─── Types para Users ───
 export interface UserResponse {
     publicId: string;
     name: string;
@@ -192,7 +179,6 @@ export interface BranchResponse {
     phone: string;
 }
 
-// ─── Users API ───
 export async function fetchUsers(): Promise<UserResponse[]> {
     return apiFetch<UserResponse[]>("/users");
 }
@@ -240,12 +226,10 @@ export async function deleteUser(publicId: string): Promise<void> {
     });
 }
 
-// ─── Branches API ───
 export async function fetchBranches(): Promise<BranchResponse[]> {
     return apiFetch<BranchResponse[]>("/branches");
 }
 
-// ─── Types para Products ───
 export interface ProductResponse {
     publicId: string;
     name: string;
@@ -266,7 +250,6 @@ export interface ProductRequest {
     type: "PRODUCT" | "SERVICE" | "PACKAGE";
 }
 
-// ─── Types para Products ───
 export type ProductType = "PRODUCT" | "SERVICE" | "PACKAGE";
 
 export interface ProductResponse {
@@ -289,7 +272,6 @@ export interface ProductRequest {
     type: ProductType;
 }
 
-// ─── Products API ───
 export async function fetchProducts(): Promise<ProductResponse[]> {
     return apiFetch<ProductResponse[]>("/products");
 }
@@ -325,4 +307,209 @@ export async function toggleProductStatus(publicId: string): Promise<ProductResp
     return apiFetch<ProductResponse>(`/products/${publicId}/toggle-status`, {
         method: "PATCH",
     });
+}
+
+export interface CashRegisterResponse {
+    publicId: string;
+    openingAmount: number;
+    salesTotal: number;
+    expectedAmount: number;
+    countedAmount: number | null;
+    difference: number | null;
+    openedAt: string;
+    closedAt: string | null;
+    status: string;
+}
+
+export interface OpenCashRequest {
+    openingAmount: number;
+}
+
+export interface CloseCashRequest {
+    countedCash: number;
+}
+
+export interface OrderCreateRequest {
+    customerName?: string;
+    childName?: string;
+}
+
+export interface OrderItemRequest {
+    productPublicId: string;
+    quantity: number;
+    eventDate?: string;
+    startTime?: string;
+    endTime?: string;
+}
+
+export interface UpdateOrderItemRequest {
+    quantity: number;
+}
+
+export interface OrderItemResponse {
+    publicId: string;
+    productPublicId: string;
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+    subtotal: number;
+    warning: string | null;
+    status: string;
+}
+
+export type OrderStatus = "OPEN" | "CLOSED" | "CANCELLED" | "PARTIALLY_PAID";
+
+export interface OrderResponse {
+    publicId: string;
+    status: OrderStatus;
+    customerName: string | null;
+    childName: string | null;
+    totalAmount: number;
+    subtotal: number;
+    tax: number;
+    createdAt: string;
+    closedAt: string | null;
+    items: OrderItemResponse[];
+}
+
+export type PaymentMethod = "CASH" | "CARD";
+
+export interface PaymentRequest {
+    amount: number;
+    paymentMethod: PaymentMethod;
+    reference?: string;
+}
+
+export interface PaymentResponse {
+    orderTotal: number;
+    totalPaid: number;
+    remainingAmount: number;
+    change: number;
+}
+
+export interface TaxSettingsResponse {
+    taxEnabled: boolean;
+    taxRate: number;
+}
+
+
+export async function openCashRegister(
+    data: OpenCashRequest
+): Promise<CashRegisterResponse> {
+    return apiFetch<CashRegisterResponse>("/cash/open", {
+        method: "POST",
+        body: JSON.stringify(data),
+    });
+}
+
+export async function getCurrentCash(): Promise<CashRegisterResponse> {
+    return apiFetch<CashRegisterResponse>("/cash/current");
+}
+
+export async function closeCashRegister(
+    data: CloseCashRequest
+): Promise<CashRegisterResponse> {
+    return apiFetch<CashRegisterResponse>("/cash/close", {
+        method: "POST",
+        body: JSON.stringify(data),
+    });
+}
+
+
+export async function createOrder(
+    data: OrderCreateRequest
+): Promise<OrderResponse> {
+    return apiFetch<OrderResponse>("/orders", {
+        method: "POST",
+        body: JSON.stringify(data),
+    });
+}
+
+export async function getOrder(publicId: string): Promise<OrderResponse> {
+    return apiFetch<OrderResponse>(`/orders/${publicId}`);
+}
+
+export async function addOrderItem(
+    orderPublicId: string,
+    data: OrderItemRequest
+): Promise<OrderResponse> {
+    return apiFetch<OrderResponse>(`/orders/${orderPublicId}/items`, {
+        method: "POST",
+        body: JSON.stringify(data),
+    });
+}
+
+export async function updateOrderItemQty(
+    orderPublicId: string,
+    itemPublicId: string,
+    data: UpdateOrderItemRequest
+): Promise<OrderResponse> {
+    return apiFetch<OrderResponse>(
+        `/orders/${orderPublicId}/items/${itemPublicId}`,
+        { method: "PUT", body: JSON.stringify(data) }
+    );
+}
+
+export async function voidOrderItem(
+    orderPublicId: string,
+    itemPublicId: string
+): Promise<OrderResponse> {
+    return apiFetch<OrderResponse>(
+        `/orders/${orderPublicId}/items/${itemPublicId}/void`,
+        { method: "POST" }
+    );
+}
+
+export async function closeOrder(publicId: string): Promise<OrderResponse> {
+    return apiFetch<OrderResponse>(`/orders/${publicId}/close`, {
+        method: "POST",
+    });
+}
+
+export async function cancelOrder(publicId: string): Promise<OrderResponse> {
+    return apiFetch<OrderResponse>(`/orders/${publicId}/cancel`, {
+        method: "POST",
+    });
+}
+
+
+export async function registerPayment(
+    orderPublicId: string,
+    data: PaymentRequest
+): Promise<PaymentResponse> {
+    return apiFetch<PaymentResponse>(`/orders/${orderPublicId}/payments`, {
+        method: "POST",
+        body: JSON.stringify(data),
+    });
+}
+
+
+export async function getTaxSettings(): Promise<TaxSettingsResponse> {
+    return apiFetch<TaxSettingsResponse>("/settings/tax");
+}
+
+
+export async function getOrderTicket(orderPublicId: string): Promise<string> {
+    const auth = getStoredAuth();
+    const headers: Record<string, string> = {};
+    if (auth?.token) {
+        headers["Authorization"] = `Bearer ${auth.token}`;
+    }
+    const res = await fetch(`${API_BASE}/orders/${orderPublicId}/ticket`, {
+        headers,
+    });
+
+    if (res.status === 401 || res.status === 403) {
+        clearStoredAuth();
+        if (
+            typeof window !== "undefined" &&
+            window.location.pathname.startsWith("/dashboard")
+        ) {
+            window.location.href = "/dashboard/login";
+        }
+        throw new ApiError("Sesión expirada", res.status);
+    }
+
+    if (!res.ok) throw new ApiError("Error al obtener ticket", res.status);
+    return res.text();
 }

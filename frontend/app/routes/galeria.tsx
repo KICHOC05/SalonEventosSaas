@@ -16,6 +16,11 @@ import {
   Heart,
 } from "lucide-react";
 import "~/styles/gallery.css";
+import { buildMeta } from "~/lib/meta";
+
+export function meta() {
+  return buildMeta("Galeria", "Explora la galeria con momentos inolvidables");
+}
 
 /* ╔══════════════════════════════════════════════╗
    ║              GALLERY DATA                    ║

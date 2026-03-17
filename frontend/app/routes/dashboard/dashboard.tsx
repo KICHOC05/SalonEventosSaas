@@ -15,6 +15,11 @@ import "~/lib/chartSetup";
 import { darkGridOptions, darkDoughnutOptions } from "~/lib/chartSetup";
 import { events } from "~/data/mockData";
 import { useAuth } from "~/lib/auth"; // ← IMPORTAR
+import { buildMeta } from "~/lib/meta";
+
+export function meta() {
+  return buildMeta("Dashboard", "Panel de control");
+}
 
 /* ── Tarjeta de estadística ── */
 function StatCard({

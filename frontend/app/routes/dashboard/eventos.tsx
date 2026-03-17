@@ -2,6 +2,11 @@
 import { useState, useRef } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { events as initialEvents, type Event } from "~/data/mockData";
+import { buildMeta } from "~/lib/meta";
+
+export function meta() {
+  return buildMeta("Eventos", "Gestion de eventos y reservaciones");
+}
 
 function StatusBadge({ status }: { status: string }) {
     const map: Record<string, { cls: string; label: string }> = {

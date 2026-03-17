@@ -1,5 +1,10 @@
 // app/routes/configuracion.tsx
 import { Settings } from "lucide-react";
+import { buildMeta } from "~/lib/meta";
+
+export function meta() {
+  return buildMeta("Configuracion", "Gestion de configuracion del sistema");
+}
 
 export default function Configuracion() {
     return (

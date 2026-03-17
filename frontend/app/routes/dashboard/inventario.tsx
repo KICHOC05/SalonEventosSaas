@@ -26,6 +26,11 @@ import {
     type ProductType,
 } from "~/lib/api";
 import { useAuth } from "~/lib/auth";
+import { buildMeta } from "~/lib/meta";
+
+export function meta() {
+  return buildMeta("Inventario", "Gestion de inentario de productos y servicios");
+}
 
 // ─── Tipo auxiliar para el formulario ───
 interface ProductFormData {

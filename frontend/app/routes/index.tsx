@@ -38,10 +38,12 @@ import {
   Coffee,
 } from "lucide-react";
 import "~/styles/landing.css";
+import { buildMeta } from "~/lib/meta";
 
-/* ═══════════════════════════════════════════
-   DATA
-   ═══════════════════════════════════════════ */
+export function meta() {
+  return buildMeta("Pagina de Inicio", "Bienvenido a Spacekids");
+}
+
 
 const videoCards = [
   {
@@ -221,9 +223,6 @@ const reviewsData = [
   },
 ];
 
-/* ═══════════════════════════════════════════
-   UTILITIES
-   ═══════════════════════════════════════════ */
 
 function useInView(threshold = 0.1) {
   const ref = useRef<HTMLDivElement>(null);
@@ -272,8 +271,8 @@ function Animate({
     <div
       ref={ref}
       className={`transition-all duration-700 ease-out ${visible
-          ? "opacity-100 translate-x-0 translate-y-0 scale-100"
-          : hidden[from]
+        ? "opacity-100 translate-x-0 translate-y-0 scale-100"
+        : hidden[from]
         } ${className}`}
       style={{ transitionDelay: `${delay}ms` }}
     >
@@ -298,9 +297,6 @@ function SectionBadge({
   );
 }
 
-/* ═══════════════════════════════════════════
-   STARS BACKGROUND
-   ═══════════════════════════════════════════ */
 
 function StarsBackground() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -340,9 +336,6 @@ function StarsBackground() {
   );
 }
 
-/* ═══════════════════════════════════════════
-   SECTION 1: HERO
-   ═══════════════════════════════════════════ */
 
 function HeroSection() {
   return (
@@ -350,7 +343,6 @@ function HeroSection() {
       id="inicio"
       className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20"
     >
-      {/* Video background */}
       <div className="absolute inset-0">
         <video
           autoPlay
@@ -401,7 +393,6 @@ function HeroSection() {
         </Animate>
       </div>
 
-      {/* Scroll indicator */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
         <div className="w-12 h-20 border-2 border-white/30 rounded-full flex justify-center bg-[#0A0A1F]/50">
           <div className="w-1.5 h-4 bg-gradient-to-b from-white to-transparent rounded-full mt-3 animate-pulse" />
@@ -411,9 +402,6 @@ function HeroSection() {
   );
 }
 
-/* ═══════════════════════════════════════════
-   SECTION 2: FEATURED EXPERIENCE (NEW)
-   ═══════════════════════════════════════════ */
 
 function FeaturedExperienceSection() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -456,7 +444,6 @@ function FeaturedExperienceSection() {
         </Animate>
 
         <div className="grid lg:grid-cols-2 gap-12 items-center">
-          {/* Featured Video (16:9) */}
           <Animate from="left">
             <div className="featured-video-container">
               <video ref={videoRef} loop playsInline className="w-full h-full">
@@ -483,7 +470,6 @@ function FeaturedExperienceSection() {
             </div>
           </Animate>
 
-          {/* Text + Stats */}
           <Animate from="right">
             <div className="space-y-8">
               <div className="bg-white/5 rounded-2xl p-8 border border-white/10">
@@ -534,9 +520,6 @@ function FeaturedExperienceSection() {
   );
 }
 
-/* ═══════════════════════════════════════════
-   SECTION 3: VIDEO SLIDER (9:16 vertical)
-   ═══════════════════════════════════════════ */
 
 function VideoSliderSection() {
   const [index, setIndex] = useState(0);
@@ -570,11 +553,10 @@ function VideoSliderSection() {
       ".video-card"
     ) as HTMLElement;
     if (!card) return;
-    const cardW = card.offsetWidth + 20; // card + gap
+    const cardW = card.offsetWidth + 20;
     trackRef.current.style.transform = `translateX(-${index * cardW}px)`;
   }, [index, visibleCards]);
 
-  // Autoplay videos
   useEffect(() => {
     const t = setTimeout(() => {
       videosRef.current.forEach((v) => v?.play().catch(() => { }));
@@ -602,7 +584,6 @@ function VideoSliderSection() {
           </p>
         </Animate>
 
-        {/* Slider */}
         <Animate>
           <div className="relative px-2 md:px-4">
             <div className="overflow-hidden">
@@ -623,14 +604,12 @@ function VideoSliderSection() {
                       <source src={vc.src} type="video/mp4" />
                     </video>
 
-                    {/* Badge */}
                     <div className="absolute top-4 left-4 z-5">
                       <span className="inline-flex items-center gap-1 px-4 py-1.5 bg-secondary text-white text-xs font-semibold rounded-full border border-white/30 shadow-[0_4px_10px_rgba(225,29,116,0.3)]">
                         <vc.BadgeIcon className="w-3 h-3" /> {vc.badge}
                       </span>
                     </div>
 
-                    {/* Overlay */}
                     <div className="absolute bottom-0 inset-x-0 p-5 bg-gradient-to-t from-[#0A0A1F] to-transparent pointer-events-none">
                       <h4 className="font-bold text-lg text-white">
                         {vc.title}
@@ -642,7 +621,6 @@ function VideoSliderSection() {
               </div>
             </div>
 
-            {/* Arrows */}
             <button
               onClick={() => slideToIndex(index - 1)}
               className="absolute left-1 md:left-2 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-base-100 border-2 border-primary flex items-center justify-center text-base-content hover:bg-primary hover:text-base-200 hover:scale-110 transition-all shadow-[0_4px_15px_rgba(0,0,0,0.5)]"
@@ -659,27 +637,24 @@ function VideoSliderSection() {
             </button>
           </div>
 
-          {/* Dots */}
           <div className="flex justify-center gap-3 mt-8 flex-wrap">
             {videoCards.map((_, i) => (
               <button
                 key={i}
                 onClick={() => slideToIndex(i)}
                 className={`h-2.5 rounded-full transition-all duration-300 ${i === index
-                    ? "w-8 bg-secondary shadow-[0_0_15px_var(--s)]"
-                    : "w-2.5 bg-base-content/30 hover:bg-base-content/50"
+                  ? "w-8 bg-secondary shadow-[0_0_15px_var(--s)]"
+                  : "w-2.5 bg-base-content/30 hover:bg-base-content/50"
                   }`}
               />
             ))}
           </div>
 
-          {/* Scroll indicator mobile */}
           <div className="scroll-indicator-mobile text-base-content/50 text-xs mt-4">
             <ChevronLeft className="w-3 h-3 inline mr-1" /> Desliza{" "}
             <ChevronRight className="w-3 h-3 inline ml-1" />
           </div>
 
-          {/* Play / Pause */}
           <div className="flex justify-center gap-4 mt-6">
             <button
               onClick={handlePauseAll}
@@ -700,9 +675,6 @@ function VideoSliderSection() {
   );
 }
 
-/* ═══════════════════════════════════════════
-   SECTION 4: PACKAGES
-   ═══════════════════════════════════════════ */
 
 function PackagesSection() {
   const dirs: AnimDir[] = ["left", "up", "right"];
@@ -728,8 +700,8 @@ function PackagesSection() {
             <Animate key={pkg.id} from={dirs[i]} delay={i * 150}>
               <div
                 className={`package-card bg-base-100 rounded-3xl p-8 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] hover:-translate-y-3 transition-all duration-400 border ${pkg.popular
-                    ? "border-2 border-secondary lg:scale-105 bg-base-300"
-                    : "border-primary/30 hover:border-secondary"
+                  ? "border-2 border-secondary lg:scale-105 bg-base-300"
+                  : "border-primary/30 hover:border-secondary"
                   } hover:shadow-[0_30px_50px_-20px_rgba(225,29,116,0.4)]`}
               >
                 {pkg.popular && (
@@ -752,7 +724,6 @@ function PackagesSection() {
                   <p className="text-base-content/60">{pkg.desc}</p>
                 </div>
 
-                {/* Features */}
                 <div className="space-y-4 mb-8">
                   {pkg.features.map((f, fi) => (
                     <div
@@ -767,7 +738,6 @@ function PackagesSection() {
                   ))}
                 </div>
 
-                {/* Price */}
                 <div className="text-center mb-8">
                   <span className="text-4xl font-bold text-base-content">
                     {pkg.price}
@@ -786,7 +756,6 @@ function PackagesSection() {
           ))}
         </div>
 
-        {/* Gallery link */}
         <Animate className="text-center mt-16">
           <Link to="/galeria" className="btn-gallery">
             <Images className="w-5 h-5" />
@@ -799,9 +768,6 @@ function PackagesSection() {
   );
 }
 
-/* ═══════════════════════════════════════════
-   SECTION 5: AVAILABILITY
-   ═══════════════════════════════════════════ */
 
 function AvailabilitySection() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -839,7 +805,6 @@ function AvailabilitySection() {
         </Animate>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Calendar */}
           <Animate from="left" className="lg:col-span-2">
             <div className="bg-base-100 border border-primary/30 rounded-3xl p-6 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
               <div className="flex items-center justify-between mb-8">
@@ -861,7 +826,6 @@ function AvailabilitySection() {
                 </div>
               </div>
 
-              {/* Weekday headers */}
               <div className="grid grid-cols-7 gap-2 mb-4">
                 {weekDays.map((wd) => (
                   <div
@@ -873,7 +837,6 @@ function AvailabilitySection() {
                 ))}
               </div>
 
-              {/* Days grid */}
               <div className="grid grid-cols-7 gap-2">
                 {calendarDays.map((d, i) => {
                   if (d.status === "empty")
@@ -905,7 +868,6 @@ function AvailabilitySection() {
                 })}
               </div>
 
-              {/* Legend */}
               <div className="flex flex-wrap gap-6 mt-8 pt-6 border-t border-primary/30">
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded bg-success/30 border border-success" />
@@ -925,7 +887,6 @@ function AvailabilitySection() {
             </div>
           </Animate>
 
-          {/* Selected date panel */}
           <Animate from="right">
             <div className="bg-base-100 border-2 border-secondary/50 rounded-3xl p-8 shadow-2xl">
               <div className="text-center mb-8">
@@ -974,9 +935,6 @@ function AvailabilitySection() {
   );
 }
 
-/* ═══════════════════════════════════════════
-   SECTION 6: REVIEWS
-   ═══════════════════════════════════════════ */
 
 function ReviewsSection() {
   const [active, setActive] = useState(0);
@@ -1009,8 +967,8 @@ function ReviewsSection() {
               <div
                 key={r.id}
                 className={`absolute inset-0 transition-opacity duration-800 ${i === active
-                    ? "opacity-100 z-10"
-                    : "opacity-0 z-0 pointer-events-none"
+                  ? "opacity-100 z-10"
+                  : "opacity-0 z-0 pointer-events-none"
                   }`}
               >
                 <div className="bg-base-100 border border-primary/30 rounded-3xl p-8 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
@@ -1043,15 +1001,14 @@ function ReviewsSection() {
             ))}
           </div>
 
-          {/* Dots */}
           <div className="flex justify-center gap-3 mt-8">
             {reviewsData.map((_, i) => (
               <button
                 key={i}
                 onClick={() => setActive(i)}
                 className={`h-3 rounded-full transition-all duration-300 ${i === active
-                    ? "w-8 bg-secondary shadow-[0_0_15px_var(--s)]"
-                    : "w-3 bg-base-content/30 hover:bg-base-content/50"
+                  ? "w-8 bg-secondary shadow-[0_0_15px_var(--s)]"
+                  : "w-3 bg-base-content/30 hover:bg-base-content/50"
                   }`}
               />
             ))}
@@ -1062,9 +1019,6 @@ function ReviewsSection() {
   );
 }
 
-/* ═══════════════════════════════════════════
-   SECTION 7: RESERVATION FORM
-   ═══════════════════════════════════════════ */
 
 function ReservationSection() {
   const [form, setForm] = useState({
@@ -1137,7 +1091,6 @@ function ReservationSection() {
           <div className="bg-base-100 border border-primary/30 rounded-3xl p-6 md:p-10 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)]">
             <form onSubmit={handleSubmit} className="space-y-6" noValidate>
               <div className="grid md:grid-cols-2 gap-6">
-                {/* Name */}
                 <div>
                   <label className="block text-base-content font-medium mb-3">
                     <User className="w-4 h-4 inline mr-2 text-secondary" />
@@ -1149,8 +1102,8 @@ function ReservationSection() {
                     onChange={(e) => update("fullName", e.target.value)}
                     placeholder="Ej: María González"
                     className={`w-full bg-base-200 border rounded-2xl px-5 py-4 text-base-content transition-all focus:outline-none focus:border-secondary focus:bg-base-100 focus:shadow-[0_0_0_4px_rgba(225,29,116,0.2)] ${errors.fullName
-                        ? "border-error"
-                        : "border-primary/30"
+                      ? "border-error"
+                      : "border-primary/30"
                       }`}
                   />
                   {errors.fullName && (
@@ -1160,7 +1113,6 @@ function ReservationSection() {
                   )}
                 </div>
 
-                {/* Phone */}
                 <div>
                   <label className="block text-base-content font-medium mb-3">
                     <Phone className="w-4 h-4 inline mr-2 text-secondary" />
@@ -1181,7 +1133,6 @@ function ReservationSection() {
               </div>
 
               <div className="grid md:grid-cols-2 gap-6">
-                {/* Date */}
                 <div>
                   <label className="block text-base-content font-medium mb-3">
                     <Calendar className="w-4 h-4 inline mr-2 text-secondary" />
@@ -1199,7 +1150,6 @@ function ReservationSection() {
                   )}
                 </div>
 
-                {/* Package */}
                 <div>
                   <label className="block text-base-content font-medium mb-3">
                     <Gift className="w-4 h-4 inline mr-2 text-secondary" />
@@ -1224,7 +1174,6 @@ function ReservationSection() {
                 </div>
               </div>
 
-              {/* Message */}
               <div>
                 <label className="block text-base-content font-medium mb-3">
                   <MessageCircle className="w-4 h-4 inline mr-2 text-secondary" />
@@ -1238,13 +1187,12 @@ function ReservationSection() {
                 />
               </div>
 
-              {/* Submit */}
               <div className="text-center pt-6">
                 <button
                   type="submit"
                   className={`btn-space-primary text-lg px-12 py-5 ${submitted
-                      ? "!bg-gradient-to-r !from-emerald-500 !to-green-600"
-                      : ""
+                    ? "!bg-gradient-to-r !from-emerald-500 !to-green-600"
+                    : ""
                     }`}
                   disabled={submitted}
                 >
@@ -1270,9 +1218,6 @@ function ReservationSection() {
   );
 }
 
-/* ═══════════════════════════════════════════
-   SECTION 8: CONTACT
-   ═══════════════════════════════════════════ */
 
 function ContactSection() {
   return (
@@ -1292,7 +1237,6 @@ function ContactSection() {
 
         <div className="grid lg:grid-cols-2 gap-12 items-start">
           <Animate from="left" className="space-y-8">
-            {/* WhatsApp CTA */}
             <a
               href="https://wa.me/521234567890?text=¡Hola! Me interesa reservar un evento en Space Kids"
               target="_blank"
@@ -1311,7 +1255,6 @@ function ContactSection() {
               </p>
             </a>
 
-            {/* Contact cards */}
             <div className="grid sm:grid-cols-2 gap-6">
               <div className="bg-base-100 border border-primary/30 rounded-2xl p-6 hover:border-primary transition shadow-[0_10px_20px_-5px_rgba(0,0,0,0.5)]">
                 <Phone className="w-8 h-8 text-primary mb-4" />
@@ -1329,7 +1272,6 @@ function ContactSection() {
               </div>
             </div>
 
-            {/* Address */}
             <div className="bg-base-100 border border-primary/30 rounded-2xl p-6 shadow-[0_10px_20px_-5px_rgba(0,0,0,0.5)]">
               <div className="flex items-start gap-4">
                 <MapPin className="w-8 h-8 text-purple-400 flex-shrink-0" />
@@ -1338,17 +1280,16 @@ function ContactSection() {
                     Nuestra base espacial
                   </h4>
                   <p className="text-base-content/80 text-lg">
-                    Av. Galaxia 123, Col. Universo
+                    Calle Ignacio Zaragoza
                   </p>
                   <p className="text-base-content/80">
-                    Ciudad de México, CDMX
+                    Centro, 42970 Atitalaquia, Hgo
                   </p>
                 </div>
               </div>
             </div>
           </Animate>
 
-          {/* Map */}
           <Animate from="right">
             <div className="rounded-2xl overflow-hidden h-[500px] border-2 border-primary/30 shadow-2xl">
               <iframe
@@ -1368,12 +1309,8 @@ function ContactSection() {
   );
 }
 
-/* ═══════════════════════════════════════════
-   MAIN PAGE EXPORT
-   ═══════════════════════════════════════════ */
 
 export default function HomePage() {
-  // Smooth scroll for hash links
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
