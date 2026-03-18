@@ -1,14 +1,19 @@
 package com.example.demo.settings.controller;
 
-import com.example.demo.common.enums.InventoryMode;
+import com.example.demo.settings.dto.CompanySettingsRequest;
+import com.example.demo.settings.dto.CompanySettingsResponse;
 import com.example.demo.settings.dto.InventoryModeRequest;
-import com.example.demo.settings.model.TenantSettings;
+import com.example.demo.settings.dto.TenantSettingsResponse;
 import com.example.demo.settings.service.TenantSettingsService;
 
 import lombok.RequiredArgsConstructor;
 
+import java.util.Map;
+
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/settings")
@@ -18,26 +23,61 @@ public class TenantSettingsController {
     private final TenantSettingsService service;
 
     // =========================
-    // GET SETTINGS
+    // GET INVENTORY SETTINGS
     // =========================
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
-    public TenantSettings getSettings() {
-
-        return service.getSettings();
+    public TenantSettingsResponse getSettings() {
+        return service.getSettingsResponse();
     }
 
     // =========================
     // UPDATE INVENTORY MODE
     // =========================
 
-  @PutMapping("/inventory-mode")
+    @PutMapping("/inventory-mode")
     @PreAuthorize("hasRole('ADMIN')")
-    public InventoryMode updateInventoryMode(
-        @RequestBody InventoryModeRequest request) {
+    public TenantSettingsResponse updateInventoryMode(
+            @RequestBody InventoryModeRequest request) {
 
-    return service.updateInventoryMode(request.getInventoryMode());
-}
+        service.updateInventoryMode(request.getInventoryMode());
+        return service.getSettingsResponse();
+    }
 
+    // =========================
+    // GET COMPANY INFO
+    // =========================
+
+    @GetMapping("/company")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    public CompanySettingsResponse getCompany() {
+        return service.getCompanySettings();
+    }
+
+    // =========================
+    // UPDATE COMPANY INFO
+    // =========================
+
+    @PutMapping("/company")
+    @PreAuthorize("hasRole('ADMIN')")
+    public CompanySettingsResponse updateCompany(
+            @RequestBody CompanySettingsRequest request) {
+
+        return service.updateCompanySettings(request);
+    }
+
+    // =========================
+    // UPLOAD LOGO
+    // =========================
+
+    @PostMapping("/logo")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, String>> uploadLogo(
+            @RequestParam("logo") MultipartFile file) {
+
+        String logoUrl = service.uploadLogo(file);
+
+        return ResponseEntity.ok(Map.of("logoUrl", logoUrl));
+    }
 }

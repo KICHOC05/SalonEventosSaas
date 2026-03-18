@@ -230,26 +230,6 @@ export async function fetchBranches(): Promise<BranchResponse[]> {
     return apiFetch<BranchResponse[]>("/branches");
 }
 
-export interface ProductResponse {
-    publicId: string;
-    name: string;
-    description: string | null;
-    price: number;
-    stock: number | null;
-    type: "PRODUCT" | "SERVICE" | "PACKAGE";
-    active: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface ProductRequest {
-    name: string;
-    description?: string;
-    price: number;
-    stock?: number;
-    type: "PRODUCT" | "SERVICE" | "PACKAGE";
-}
-
 export type ProductType = "PRODUCT" | "SERVICE" | "PACKAGE";
 
 export interface ProductResponse {
@@ -512,4 +492,104 @@ export async function getOrderTicket(orderPublicId: string): Promise<string> {
 
     if (!res.ok) throw new ApiError("Error al obtener ticket", res.status);
     return res.text();
+}
+
+export interface CompanySettingsResponse {
+    businessName: string;
+    phone: string | null;
+    website: string | null;
+    logoUrl: string | null;
+}
+
+export interface CompanySettingsRequest {
+    businessName?: string;
+    phone?: string;
+    website?: string;
+}
+
+export interface TenantSettingsResponse {
+    inventoryMode: "STRICT" | "WARNING" | "DISABLED";
+}
+
+export async function getCompanySettings(): Promise<CompanySettingsResponse> {
+    return apiFetch<CompanySettingsResponse>("/settings/company");
+}
+
+export async function updateCompanySettings(
+    data: CompanySettingsRequest
+): Promise<CompanySettingsResponse> {
+    return apiFetch<CompanySettingsResponse>("/settings/company", {
+        method: "PUT",
+        body: JSON.stringify(data),
+    });
+}
+
+export async function uploadLogo(file: File): Promise<{ logoUrl: string }> {
+    const auth = getStoredAuth();
+    const formData = new FormData();
+    formData.append("logo", file);
+
+    const headers: Record<string, string> = {};
+    if (auth?.token) {
+        headers["Authorization"] = `Bearer ${auth.token}`;
+    }
+    // NO poner Content-Type: el browser lo genera con boundary
+
+    const res = await fetch(`${API_BASE}/settings/logo`, {
+        method: "POST",
+        headers,
+        body: formData,
+    });
+
+    if (res.status === 401 || res.status === 403) {
+        clearStoredAuth();
+        throw new ApiError("Sesión expirada", res.status);
+    }
+
+    if (!res.ok) {
+        let errorBody: any = {};
+        try { errorBody = await res.json(); } catch {}
+        throw new ApiError(
+            errorBody.error || `Error ${res.status}`,
+            res.status,
+            errorBody
+        );
+    }
+
+    return res.json();
+}
+
+// ═══════════════════════════════════════
+// TENANT SETTINGS (INVENTORY MODE)
+// ═══════════════════════════════════════
+
+export async function getTenantSettings(): Promise<TenantSettingsResponse> {
+    return apiFetch<TenantSettingsResponse>("/settings");
+}
+
+export async function updateInventoryMode(
+    mode: "STRICT" | "WARNING" | "DISABLED"
+): Promise<TenantSettingsResponse> {
+    return apiFetch<TenantSettingsResponse>("/settings/inventory-mode", {
+        method: "PUT",
+        body: JSON.stringify({ inventoryMode: mode }),
+    });
+}
+
+// ═══════════════════════════════════════
+// TAX SETTINGS
+// ═══════════════════════════════════════
+
+export interface TaxSettingsRequest {
+    taxEnabled: boolean;
+    taxRate: number;
+}
+
+export async function updateTaxSettings(
+    data: TaxSettingsRequest
+): Promise<TaxSettingsResponse> {
+    return apiFetch<TaxSettingsResponse>("/settings/tax", {
+        method: "PUT",
+        body: JSON.stringify(data),
+    });
 }
