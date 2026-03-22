@@ -1,4 +1,3 @@
-
 const API_BASE = "http://localhost:8080/api";
 
 export interface LoginRequest {
@@ -372,7 +371,6 @@ export interface TaxSettingsResponse {
     taxRate: number;
 }
 
-
 export async function openCashRegister(
     data: OpenCashRequest
 ): Promise<CashRegisterResponse> {
@@ -394,7 +392,6 @@ export async function closeCashRegister(
         body: JSON.stringify(data),
     });
 }
-
 
 export async function createOrder(
     data: OrderCreateRequest
@@ -452,7 +449,6 @@ export async function cancelOrder(publicId: string): Promise<OrderResponse> {
     });
 }
 
-
 export async function registerPayment(
     orderPublicId: string,
     data: PaymentRequest
@@ -463,11 +459,9 @@ export async function registerPayment(
     });
 }
 
-
 export async function getTaxSettings(): Promise<TaxSettingsResponse> {
     return apiFetch<TaxSettingsResponse>("/settings/tax");
 }
-
 
 export async function getOrderTicket(orderPublicId: string): Promise<string> {
     const auth = getStoredAuth();
@@ -548,7 +542,7 @@ export async function uploadLogo(file: File): Promise<{ logoUrl: string }> {
 
     if (!res.ok) {
         let errorBody: any = {};
-        try { errorBody = await res.json(); } catch {}
+        try { errorBody = await res.json(); } catch { }
         throw new ApiError(
             errorBody.error || `Error ${res.status}`,
             res.status,
@@ -592,4 +586,125 @@ export async function updateTaxSettings(
         method: "PUT",
         body: JSON.stringify(data),
     });
+}
+
+// ═══════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════
+
+export interface InventorySummary {
+    totalProducts: number;
+    totalStock: number;
+    lowStockCount: number;
+    lowStockProducts: {
+        publicId: string;
+        name: string;
+        stock: number;
+    }[];
+}
+
+export interface SalesChartData {
+    labels: string[];
+    data: number[];
+    fullDates: string[];
+}
+
+export interface TopItem {
+    publicId: string;
+    name: string;
+    quantitySold: number;
+    totalRevenue: number;
+}
+
+export interface UpcomingEvent {
+    date: string;
+    client: string;
+    packageName: string;
+    children: number;
+    status: string;
+}
+
+export interface DashboardData {
+    salesToday: number;
+    salesYesterday: number;
+    salesTodayGrowth: number;
+    monthlyRevenue: number;
+    previousMonthRevenue: number;
+    monthlyGrowth: number;
+    inventory: InventorySummary;
+    salesChart: SalesChartData;
+    topPackages: TopItem[];
+    upcomingEvents: UpcomingEvent[];
+    scheduledEventsCount: number;
+}
+
+export interface PaymentBreakdownData {
+    cashTotal: number;
+    cardTotal: number;
+    transferTotal: number;
+}
+
+export interface StatsData {
+    rangeDays: number;
+    dateFrom: string;
+    dateTo: string;
+    dailySales: SalesChartData;
+    salesByProduct: TopItem[];
+    salesByPackage: TopItem[];
+    topProducts: TopItem[];
+    totalSales: number;
+    averageTicket: number;
+    growthPercentage: number;
+    totalOrders: number;
+    scheduledEvents: number;
+    paymentBreakdown: PaymentBreakdownData;
+}
+
+export async function fetchDashboard(): Promise<DashboardData> {
+    return apiFetch<DashboardData>("/dashboard");
+}
+
+export async function fetchStats(range: number = 7): Promise<StatsData> {
+    return apiFetch<StatsData>(`/dashboard/stats?range=${range}`);
+}
+
+// ═══════════════════════════════════════
+// ACTUALIZAR PaymentResponse
+// ═══════════════════════════════════════
+
+// Reemplaza la interfaz PaymentResponse existente:
+// (ya declarada arriba, actualiza con los nuevos campos)
+
+export interface PaymentResponseUpdated {
+    orderTotal: number;
+    totalPaid: number;
+    remainingAmount: number;
+    change: number;
+    amountReceived: number;
+    amountApplied: number;
+    paymentMethod: string;
+}
+
+// ═══════════════════════════════════════
+// ACTUALIZAR CashRegisterResponse
+// ═══════════════════════════════════════
+
+export interface CashRegisterResponseUpdated {
+    publicId: string;
+    openingAmount: number;
+    cashSales: number;
+    cardSales: number;
+    transferSales: number;
+    salesTotal: number;
+    expectedCash: number;
+    expectedAmount: number;
+    countedAmount: number | null;
+    difference: number | null;
+    openedAt: string;
+    closedAt: string | null;
+    status: string;
+}
+
+export async function getCurrentCashUpdated(): Promise<CashRegisterResponseUpdated> {
+    return apiFetch<CashRegisterResponseUpdated>("/cash/current");
 }

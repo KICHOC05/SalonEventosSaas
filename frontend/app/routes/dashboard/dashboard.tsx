@@ -1,5 +1,5 @@
 // app/routes/dashboard.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router";
 import {
     DollarSign,
@@ -7,18 +7,21 @@ import {
     TrendingUp,
     Package,
     ArrowUp,
+    ArrowDown,
     Users,
     ShieldCheck,
+    AlertTriangle,
+    Loader2,
 } from "lucide-react";
 import { Line, Doughnut } from "react-chartjs-2";
 import "~/lib/chartSetup";
 import { darkGridOptions, darkDoughnutOptions } from "~/lib/chartSetup";
-import { events } from "~/data/mockData";
-import { useAuth } from "~/lib/auth"; // ← IMPORTAR
+import { useAuth } from "~/lib/auth";
 import { buildMeta } from "~/lib/meta";
+import { fetchDashboard, type DashboardData } from "~/lib/api";
 
 export function meta() {
-  return buildMeta("Dashboard", "Panel de control");
+    return buildMeta("Dashboard", "Panel de control");
 }
 
 /* ── Tarjeta de estadística ── */
@@ -60,61 +63,117 @@ function StatCard({
     );
 }
 
-/* ── Badge de estado ── */
-function StatusBadge({ status }: { status: string }) {
-    const map: Record<string, { cls: string; label: string }> = {
-        active: { cls: "badge-success", label: "Activo" },
-        pending: { cls: "badge-warning", label: "Pendiente" },
-        cancelled: { cls: "badge-error", label: "Cancelado" },
-    };
-    const { cls, label } = map[status] ?? { cls: "badge-ghost", label: status };
-    return <span className={`badge badge-sm ${cls}`}>{label}</span>;
+/* ── Formato de moneda ── */
+function formatCurrency(amount: number): string {
+    return new Intl.NumberFormat("es-MX", {
+        style: "currency",
+        currency: "MXN",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+    }).format(amount);
+}
+
+/* ── Growth Badge ── */
+function GrowthBadge({ value, label }: { value: number; label: string }) {
+    const isPositive = value >= 0;
+    return (
+        <span className={`flex items-center gap-1 ${isPositive ? "text-success" : "text-error"}`}>
+            {isPositive ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+            {Math.abs(value).toFixed(1)}%{" "}
+            <span className="text-base-content/50">{label}</span>
+        </span>
+    );
 }
 
 /* ── Página Dashboard ── */
 export default function Dashboard() {
     const [isClient, setIsClient] = useState(false);
-    useEffect(() => setIsClient(true), []);
+    const [data, setData] = useState<DashboardData | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    // ═══════════════════════════════════════════
-    // OBTENER ROL DEL USUARIO AUTENTICADO
-    // ═══════════════════════════════════════════
     const { user, role, isAdmin, isManager } = useAuth();
-
-    // Solo ADMIN y MANAGER pueden ver la sección de usuarios
     const canViewUsers = isAdmin || isManager;
 
-    const salesData = {
-        labels: ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"],
-        datasets: [
-            {
-                label: "Ventas ($)",
-                data: [1200, 1900, 3000, 5000, 2000, 3000, 4500],
-                borderColor: "#06b6d4",
-                backgroundColor: "rgba(6,182,212,0.1)",
-                borderWidth: 2,
-                fill: true,
-                tension: 0.4,
-            },
-        ],
-    };
+    const loadDashboard = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const result = await fetchDashboard();
+            setData(result);
+        } catch (err: any) {
+            setError(err.message || "Error al cargar dashboard");
+        } finally {
+            setLoading(false);
+        }
+    }, []);
 
-    const packagesData = {
-        labels: ["Cohete Básico", "Viaje Galáctico", "Misión Súper Space"],
-        datasets: [
-            {
-                data: [30, 50, 20],
-                backgroundColor: ["#06b6d4", "#8b5cf6", "#ec4899"],
-                borderWidth: 0,
-            },
-        ],
-    };
+    useEffect(() => {
+        setIsClient(true);
+        loadDashboard();
+    }, [loadDashboard]);
+
+    // Auto-refresh cada 5 minutos
+    useEffect(() => {
+        const interval = setInterval(loadDashboard, 5 * 60 * 1000);
+        return () => clearInterval(interval);
+    }, [loadDashboard]);
+
+    // ── Chart data ──
+    const salesChartData = data
+        ? {
+              labels: data.salesChart.labels,
+              datasets: [
+                  {
+                      label: "Ventas ($)",
+                      data: data.salesChart.data,
+                      borderColor: "#06b6d4",
+                      backgroundColor: "rgba(6,182,212,0.1)",
+                      borderWidth: 2,
+                      fill: true,
+                      tension: 0.4,
+                  },
+              ],
+          }
+        : null;
+
+    const packagesChartData = data && data.topPackages.length > 0
+        ? {
+              labels: data.topPackages.map((p) => p.name),
+              datasets: [
+                  {
+                      data: data.topPackages.map((p) => p.quantitySold),
+                      backgroundColor: ["#06b6d4", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981"],
+                      borderWidth: 0,
+                  },
+              ],
+          }
+        : null;
+
+    if (loading && !data) {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <span className="ml-3 text-base-content/60">Cargando dashboard...</span>
+            </div>
+        );
+    }
+
+    if (error && !data) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+                <AlertTriangle className="w-12 h-12 text-error" />
+                <p className="text-error">{error}</p>
+                <button className="btn btn-primary btn-sm" onClick={loadDashboard}>
+                    Reintentar
+                </button>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
-            {/* ═══════════════════════════════════════
-                SALUDO CON ROL
-            ═══════════════════════════════════════ */}
+            {/* ═══ SALUDO CON ROL ═══ */}
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">
@@ -132,66 +191,78 @@ export default function Dashboard() {
                         )}
                     </div>
                 </div>
+                {loading && (
+                    <Loader2 className="w-5 h-5 animate-spin text-base-content/30" />
+                )}
             </div>
 
-            {/* Tarjetas de estadísticas */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                <StatCard
-                    title="Ventas del día"
-                    value="$2,450"
-                    icon={DollarSign}
-                    iconBg="bg-primary/10"
-                    iconColor="text-primary"
-                    delay={100}
-                    footer={
-                        <span className="text-success flex items-center gap-1">
-                            <ArrowUp className="w-3 h-3" /> 12%{" "}
-                            <span className="text-base-content/50">vs. ayer</span>
-                        </span>
-                    }
-                />
-                <StatCard
-                    title="Eventos programados"
-                    value="8"
-                    icon={CalendarCheck}
-                    iconBg="bg-secondary/10"
-                    iconColor="text-secondary"
-                    delay={200}
-                    footer={<span className="text-base-content/50">Esta semana</span>}
-                />
-                <StatCard
-                    title="Ingresos del mes"
-                    value="$45,230"
-                    icon={TrendingUp}
-                    iconBg="bg-accent/10"
-                    iconColor="text-accent"
-                    delay={300}
-                    footer={
-                        <span className="text-success flex items-center gap-1">
-                            <ArrowUp className="w-3 h-3" /> 8%{" "}
-                            <span className="text-base-content/50">vs. mes anterior</span>
-                        </span>
-                    }
-                />
-                <StatCard
-                    title="Productos en inventario"
-                    value="142"
-                    icon={Package}
-                    iconBg="bg-success/10"
-                    iconColor="text-success"
-                    delay={400}
-                    footer={<span className="text-error">3 productos bajos</span>}
-                />
-            </div>
+            {/* ═══ TARJETAS DE ESTADÍSTICAS ═══ */}
+            {data && (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                    <StatCard
+                        title="Ventas del día"
+                        value={formatCurrency(data.salesToday)}
+                        icon={DollarSign}
+                        iconBg="bg-primary/10"
+                        iconColor="text-primary"
+                        delay={100}
+                        footer={
+                            <GrowthBadge value={data.salesTodayGrowth} label="vs. ayer" />
+                        }
+                    />
+                    <StatCard
+                        title="Eventos programados"
+                        value={String(data.scheduledEventsCount)}
+                        icon={CalendarCheck}
+                        iconBg="bg-secondary/10"
+                        iconColor="text-secondary"
+                        delay={200}
+                        footer={<span className="text-base-content/50">Próximamente</span>}
+                    />
+                    <StatCard
+                        title="Ingresos del mes"
+                        value={formatCurrency(data.monthlyRevenue)}
+                        icon={TrendingUp}
+                        iconBg="bg-accent/10"
+                        iconColor="text-accent"
+                        delay={300}
+                        footer={
+                            <GrowthBadge value={data.monthlyGrowth} label="vs. mes anterior" />
+                        }
+                    />
+                    <StatCard
+                        title="Productos en inventario"
+                        value={String(data.inventory.totalProducts)}
+                        icon={Package}
+                        iconBg="bg-success/10"
+                        iconColor="text-success"
+                        delay={400}
+                        footer={
+                            data.inventory.lowStockCount > 0 ? (
+                                <span className="text-error">
+                                    {data.inventory.lowStockCount} producto{data.inventory.lowStockCount > 1 ? "s" : ""} con stock bajo
+                                </span>
+                            ) : (
+                                <span className="text-success">Stock OK</span>
+                            )
+                        }
+                    />
+                </div>
+            )}
 
-            {/* Gráficas */}
+            {/* ═══ GRÁFICAS ═══ */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="card bg-base-100 shadow-sm">
                     <div className="card-body">
                         <h3 className="card-title text-base">Ventas de la semana</h3>
                         <div className="chart-container">
-                            {isClient && (
-                                <Line data={salesData} options={darkGridOptions as any} />
+                            {isClient && salesChartData && (
+                                <Line data={salesChartData} options={darkGridOptions as any} />
+                            )}
+                            {(!salesChartData || !isClient) && (
+                                <div className="flex items-center justify-center h-64 text-base-content/30">
+                                    Sin datos
+                                </div>
                             )}
                         </div>
                     </div>
@@ -201,20 +272,45 @@ export default function Dashboard() {
                     <div className="card-body">
                         <h3 className="card-title text-base">Paquetes más vendidos</h3>
                         <div className="chart-container">
-                            {isClient && (
+                            {isClient && packagesChartData && (
                                 <Doughnut
-                                    data={packagesData}
+                                    data={packagesChartData}
                                     options={darkDoughnutOptions as any}
                                 />
+                            )}
+                            {(!packagesChartData || !isClient) && (
+                                <div className="flex items-center justify-center h-64 text-base-content/30">
+                                    Sin datos de paquetes
+                                </div>
                             )}
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* ═══════════════════════════════════════════════════
-                SECCIÓN DE USUARIOS - SOLO ADMIN / MANAGER
-            ═══════════════════════════════════════════════════ */}
+            {/* ═══ PRODUCTOS CON STOCK BAJO ═══ */}
+            {data && data.inventory.lowStockProducts.length > 0 && (
+                <div className="card bg-base-100 shadow-sm border-l-4 border-warning">
+                    <div className="card-body">
+                        <div className="flex items-center gap-2 mb-3">
+                            <AlertTriangle className="w-5 h-5 text-warning" />
+                            <h3 className="card-title text-base">Productos con stock bajo</h3>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {data.inventory.lowStockProducts.map((p) => (
+                                <div
+                                    key={p.publicId}
+                                    className="badge badge-warning badge-outline gap-1 p-3"
+                                >
+                                    {p.name}: {p.stock} uds
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ═══ SECCIÓN DE USUARIOS - SOLO ADMIN / MANAGER ═══ */}
             {canViewUsers && (
                 <div className="card bg-base-100 shadow-sm">
                     <div className="card-body">
@@ -241,7 +337,7 @@ export default function Dashboard() {
                 </div>
             )}
 
-            {/* Eventos próximos */}
+            {/* ═══ EVENTOS PRÓXIMOS (placeholder) ═══ */}
             <div className="card bg-base-100 shadow-sm">
                 <div className="card-body">
                     <div className="flex items-center justify-between mb-4">
@@ -250,32 +346,40 @@ export default function Dashboard() {
                             Ver todos
                         </Link>
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="table">
-                            <thead>
-                                <tr>
-                                    <th>Fecha</th>
-                                    <th>Cliente</th>
-                                    <th>Paquete</th>
-                                    <th>Niños</th>
-                                    <th>Estado</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {events.slice(0, 3).map((ev) => (
-                                    <tr key={ev.id} className="hover">
-                                        <td>{ev.date}</td>
-                                        <td>{ev.client}</td>
-                                        <td>{ev.package}</td>
-                                        <td>{ev.children}</td>
-                                        <td>
-                                            <StatusBadge status={ev.status} />
-                                        </td>
+                    {data && data.upcomingEvents.length > 0 ? (
+                        <div className="overflow-x-auto">
+                            <table className="table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Cliente</th>
+                                        <th>Paquete</th>
+                                        <th>Niños</th>
+                                        <th>Estado</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody>
+                                    {data.upcomingEvents.map((ev, idx) => (
+                                        <tr key={idx} className="hover">
+                                            <td>{ev.date}</td>
+                                            <td>{ev.client}</td>
+                                            <td>{ev.packageName}</td>
+                                            <td>{ev.children}</td>
+                                            <td>
+                                                <span className="badge badge-sm badge-ghost">
+                                                    {ev.status}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <p className="text-base-content/40 text-center py-8">
+                            No hay eventos próximos. El módulo de eventos estará disponible pronto.
+                        </p>
+                    )}
                 </div>
             </div>
         </div>

@@ -1,3 +1,4 @@
+// src/main/java/com/example/demo/payment/model/Payment.java
 package com.example.demo.payment.model;
 
 import com.example.demo.branch.model.Branch;
@@ -5,58 +6,62 @@ import com.example.demo.common.enums.PaymentMethod;
 import com.example.demo.order.model.Order;
 import com.example.demo.tenant.model.Tenant;
 import com.example.demo.user.model.User;
+
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+@Data
 @Entity
 @Table(name = "payments")
-@Getter
-@Setter
 public class Payment {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, updatable = false)
+    @Column(name = "public_id", nullable = false, unique = true)
     private String publicId;
 
-    @PrePersist
-    public void generatePublicId() {
-        if (this.publicId == null) {
-            this.publicId = UUID.randomUUID().toString();
-        }
-    }
-
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(nullable = false)
+    @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(nullable = false)
+    @JoinColumn(name = "tenant_id", nullable = false)
     private Tenant tenant;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(nullable = false)
+    @JoinColumn(name = "branch_id", nullable = false)
     private Branch branch;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(nullable = false)
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(nullable = false)
+    @Column(nullable = false, precision = 38, scale = 2)
     private BigDecimal amount;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "payment_method", nullable = false)
     private PaymentMethod paymentMethod;
 
+    @Column
     private String reference;
 
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    public void prePersist() {
+        if (this.publicId == null) {
+            this.publicId = UUID.randomUUID().toString();
+        }
+        if (this.createdAt == null) {
+            this.createdAt = LocalDateTime.now();
+        }
+    }
 }

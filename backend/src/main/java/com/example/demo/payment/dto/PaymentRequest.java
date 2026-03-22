@@ -1,19 +1,15 @@
+// src/main/java/com/example/demo/payment/dto/PaymentRequest.java
 package com.example.demo.payment.dto;
 
 import com.example.demo.common.enums.PaymentMethod;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
 
 import java.math.BigDecimal;
 
-@Getter
-@Setter
+@Data
 public class PaymentRequest {
 
     private BigDecimal amount;
-
     private PaymentMethod paymentMethod;
-
     private String reference;
-
 }
