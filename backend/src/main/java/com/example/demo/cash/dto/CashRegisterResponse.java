@@ -1,4 +1,3 @@
-// src/main/java/com/example/demo/cash/dto/CashRegisterResponse.java
 package com.example.demo.cash.dto;
 
 import lombok.Data;
@@ -11,18 +10,16 @@ public class CashRegisterResponse {
     private String publicId;
     private BigDecimal openingAmount;
 
-    // 🔥 Desglose por método de pago
-    private BigDecimal cashSales; // Solo efectivo
-    private BigDecimal cardSales; // Solo tarjeta
-    private BigDecimal transferSales; // Solo transferencia
+    private BigDecimal cashSales;
+    private BigDecimal cardSales;
+    private BigDecimal transferSales;
 
-    // Totales
-    private BigDecimal salesTotal; // cashSales + cardSales + transferSales
-    private BigDecimal expectedCash; // openingAmount + cashSales (solo efectivo cuenta)
-    private BigDecimal expectedAmount; // openingAmount + salesTotal (referencia)
+    private BigDecimal salesTotal;
+    private BigDecimal expectedCash;
+    private BigDecimal expectedAmount;
 
-    private BigDecimal countedAmount; // Lo que se contó al cerrar
-    private BigDecimal difference; // countedAmount - expectedCash
+    private BigDecimal countedAmount;
+    private BigDecimal difference;
 
     private LocalDateTime openedAt;
     private LocalDateTime closedAt;

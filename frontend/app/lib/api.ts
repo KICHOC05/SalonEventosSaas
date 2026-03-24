@@ -86,6 +86,22 @@ export async function apiFetch<T>(
     });
 
     if (response.status === 401 || response.status === 403) {
+        if (endpoint === "/auth/login") {
+            let errorBody: any = {};
+            try {
+                const text = await response.text();
+                if (text && text.trim().length > 0) {
+                    errorBody = JSON.parse(text);
+                }
+            } catch {
+            }
+            throw new ApiError(
+                errorBody.message || errorBody.error || "Credenciales incorrectas",
+                response.status,
+                errorBody
+            );
+        }
+
         clearStoredAuth();
         if (
             typeof window !== "undefined" &&
@@ -106,7 +122,7 @@ export async function apiFetch<T>(
         } catch {
         }
         throw new ApiError(
-            errorBody.error || `Error ${response.status}`,
+            errorBody.message || errorBody.error || `Error ${response.status}`,
             response.status,
             errorBody
         );
@@ -239,6 +255,9 @@ export interface ProductResponse {
     stock: number | null;
     type: ProductType;
     active: boolean;
+    department: string;
+    durationMinutes: number | null;
+    requiresSchedule: boolean | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -249,6 +268,9 @@ export interface ProductRequest {
     price: number;
     stock?: number;
     type: ProductType;
+    department: string;
+    durationMinutes?: number;
+    requiresSchedule?: boolean;
 }
 
 export async function fetchProducts(): Promise<ProductResponse[]> {
@@ -291,7 +313,11 @@ export async function toggleProductStatus(publicId: string): Promise<ProductResp
 export interface CashRegisterResponse {
     publicId: string;
     openingAmount: number;
+    cashSales: number;
+    cardSales: number;
+    transferSales: number;
     salesTotal: number;
+    expectedCash: number;
     expectedAmount: number;
     countedAmount: number | null;
     difference: number | null;
@@ -351,7 +377,7 @@ export interface OrderResponse {
     items: OrderItemResponse[];
 }
 
-export type PaymentMethod = "CASH" | "CARD";
+export type PaymentMethod = "CASH" | "CARD" | "TRANSFER";
 
 export interface PaymentRequest {
     amount: number;
@@ -364,6 +390,9 @@ export interface PaymentResponse {
     totalPaid: number;
     remainingAmount: number;
     change: number;
+    amountReceived: number;
+    amountApplied: number;
+    paymentMethod: string;
 }
 
 export interface TaxSettingsResponse {
@@ -527,7 +556,6 @@ export async function uploadLogo(file: File): Promise<{ logoUrl: string }> {
     if (auth?.token) {
         headers["Authorization"] = `Bearer ${auth.token}`;
     }
-    // NO poner Content-Type: el browser lo genera con boundary
 
     const res = await fetch(`${API_BASE}/settings/logo`, {
         method: "POST",
@@ -553,9 +581,6 @@ export async function uploadLogo(file: File): Promise<{ logoUrl: string }> {
     return res.json();
 }
 
-// ═══════════════════════════════════════
-// TENANT SETTINGS (INVENTORY MODE)
-// ═══════════════════════════════════════
 
 export async function getTenantSettings(): Promise<TenantSettingsResponse> {
     return apiFetch<TenantSettingsResponse>("/settings");
@@ -570,9 +595,6 @@ export async function updateInventoryMode(
     });
 }
 
-// ═══════════════════════════════════════
-// TAX SETTINGS
-// ═══════════════════════════════════════
 
 export interface TaxSettingsRequest {
     taxEnabled: boolean;
@@ -588,9 +610,6 @@ export async function updateTaxSettings(
     });
 }
 
-// ═══════════════════════════════════════
-// DASHBOARD
-// ═══════════════════════════════════════
 
 export interface InventorySummary {
     totalProducts: number;
@@ -666,45 +685,4 @@ export async function fetchDashboard(): Promise<DashboardData> {
 
 export async function fetchStats(range: number = 7): Promise<StatsData> {
     return apiFetch<StatsData>(`/dashboard/stats?range=${range}`);
-}
-
-// ═══════════════════════════════════════
-// ACTUALIZAR PaymentResponse
-// ═══════════════════════════════════════
-
-// Reemplaza la interfaz PaymentResponse existente:
-// (ya declarada arriba, actualiza con los nuevos campos)
-
-export interface PaymentResponseUpdated {
-    orderTotal: number;
-    totalPaid: number;
-    remainingAmount: number;
-    change: number;
-    amountReceived: number;
-    amountApplied: number;
-    paymentMethod: string;
-}
-
-// ═══════════════════════════════════════
-// ACTUALIZAR CashRegisterResponse
-// ═══════════════════════════════════════
-
-export interface CashRegisterResponseUpdated {
-    publicId: string;
-    openingAmount: number;
-    cashSales: number;
-    cardSales: number;
-    transferSales: number;
-    salesTotal: number;
-    expectedCash: number;
-    expectedAmount: number;
-    countedAmount: number | null;
-    difference: number | null;
-    openedAt: string;
-    closedAt: string | null;
-    status: string;
-}
-
-export async function getCurrentCashUpdated(): Promise<CashRegisterResponseUpdated> {
-    return apiFetch<CashRegisterResponseUpdated>("/cash/current");
 }

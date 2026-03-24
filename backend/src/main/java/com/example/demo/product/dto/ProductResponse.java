@@ -14,10 +14,11 @@ public class ProductResponse {
     private Integer stock;
     private ProductType type;
     private Boolean active;
+    private String department;
+    private Integer durationMinutes;
+    private Boolean requiresSchedule;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-
-    // GETTERS Y SETTERS
 
     public String getPublicId() {
         return publicId;
@@ -73,6 +74,30 @@ public class ProductResponse {
 
     public void setActive(Boolean active) {
         this.active = active;
+    }
+
+    public String getDepartment() {
+        return department;
+    }
+
+    public void setDepartment(String department) {
+        this.department = department;
+    }
+
+    public Integer getDurationMinutes() {
+        return durationMinutes;
+    }
+
+    public void setDurationMinutes(Integer durationMinutes) {
+        this.durationMinutes = durationMinutes;
+    }
+
+    public Boolean getRequiresSchedule() {
+        return requiresSchedule;
+    }
+
+    public void setRequiresSchedule(Boolean requiresSchedule) {
+        this.requiresSchedule = requiresSchedule;
     }
 
     public LocalDateTime getCreatedAt() {

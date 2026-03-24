@@ -5,7 +5,7 @@ import { useAuth } from "~/lib/auth";
 import { buildMeta } from "~/lib/meta";
 
 export function meta() {
-  return buildMeta("Inicio de Sesion", "Acceso al panel de administracion");
+    return buildMeta("Inicio de Sesion", "Acceso al panel de administracion");
 }
 
 export default function DashboardLogin() {
@@ -36,7 +36,13 @@ export default function DashboardLogin() {
             await login({ tenantPublicId, email, password });
             navigate("/dashboard", { replace: true });
         } catch (err: any) {
-            setError(err.message || "Error al iniciar sesión");
+            if (err.status === 401 || err.status === 403) {
+                setError("Correo o contraseña incorrectos");
+            } else if (err.status === 500) {
+                setError("Error interno del servidor. Intenta más tarde.");
+            } else {
+                setError(err.message || "Error al iniciar sesión");
+            }
         } finally {
             setLoading(false);
         }

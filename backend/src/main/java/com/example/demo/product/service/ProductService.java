@@ -20,9 +20,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final TenantRepository tenantRepository;
 
-    // 🔹 CREATE
     public ProductResponse create(ProductRequest request) {
-
         Long tenantId = TenantContext.getTenantId();
 
         Tenant tenant = tenantRepository.findById(tenantId)
@@ -35,41 +33,33 @@ public class ProductService {
         product.setPrice(request.getPrice());
         product.setStock(request.getStock());
         product.setType(request.getType());
+        product.setDepartment(request.getDepartment());
+        product.setDurationMinutes(request.getDurationMinutes());
+        product.setRequiresSchedule(request.getRequiresSchedule());
         product.setActive(true);
 
         productRepository.save(product);
-
         return mapToResponse(product);
     }
 
-    // 🔹 FIND ALL (activos e inactivos)
     public List<ProductResponse> findAll() {
-
         Long tenantId = TenantContext.getTenantId();
-
         return productRepository.findAllByTenant_Id(tenantId)
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
     }
 
-    // 🔹 FIND BY PUBLIC ID
     public ProductResponse findByPublicId(String publicId) {
-
         Long tenantId = TenantContext.getTenantId();
-
         Product product = productRepository
                 .findByPublicIdAndTenant_IdAndActiveTrue(publicId, tenantId)
                 .orElseThrow(() -> new EntityNotFoundException("Product not found"));
-
         return mapToResponse(product);
     }
 
-    // 🔹 UPDATE
     public ProductResponse update(String publicId, ProductRequest request) {
-
         Long tenantId = TenantContext.getTenantId();
-
         Product product = productRepository
                 .findByPublicIdAndTenant_IdAndActiveTrue(publicId, tenantId)
                 .orElseThrow(() -> new EntityNotFoundException("Product not found"));
@@ -79,28 +69,34 @@ public class ProductService {
         product.setPrice(request.getPrice());
         product.setStock(request.getStock());
         product.setType(request.getType());
+        product.setDepartment(request.getDepartment());
+        product.setDurationMinutes(request.getDurationMinutes());
+        product.setRequiresSchedule(request.getRequiresSchedule());
 
         productRepository.save(product);
-
         return mapToResponse(product);
     }
 
-    // 🔹 DELETE (soft)
     public void delete(String publicId) {
-
         Long tenantId = TenantContext.getTenantId();
-
         Product product = productRepository
                 .findByPublicIdAndTenant_IdAndActiveTrue(publicId, tenantId)
                 .orElseThrow(() -> new EntityNotFoundException("Product not found"));
-
         product.setActive(false);
-
         productRepository.save(product);
     }
 
-    private ProductResponse mapToResponse(Product product) {
+    public ProductResponse toggleStatus(String publicId) {
+        Long tenantId = TenantContext.getTenantId();
+        Product product = productRepository
+                .findByPublicIdAndTenant_Id(publicId, tenantId)
+                .orElseThrow(() -> new EntityNotFoundException("Product not found"));
+        product.setActive(!product.getActive());
+        productRepository.save(product);
+        return mapToResponse(product);
+    }
 
+    private ProductResponse mapToResponse(Product product) {
         ProductResponse response = new ProductResponse();
         response.setPublicId(product.getPublicId());
         response.setName(product.getName());
@@ -109,26 +105,11 @@ public class ProductService {
         response.setStock(product.getStock());
         response.setType(product.getType());
         response.setActive(product.getActive());
+        response.setDepartment(product.getDepartment());
+        response.setDurationMinutes(product.getDurationMinutes());
+        response.setRequiresSchedule(product.getRequiresSchedule());
         response.setCreatedAt(product.getCreatedAt());
         response.setUpdatedAt(product.getUpdatedAt());
-
         return response;
-    }
-
-    // 🔹 TOGGLE STATUS (activar/desactivar)
-    public ProductResponse toggleStatus(String publicId) {
-
-        Long tenantId = TenantContext.getTenantId();
-
-        // Buscar incluyendo inactivos (sin filtro de active)
-        Product product = productRepository
-                .findByPublicIdAndTenant_Id(publicId, tenantId)
-                .orElseThrow(() -> new EntityNotFoundException("Product not found"));
-
-        // Invertir el estado
-        product.setActive(!product.getActive());
-        productRepository.save(product);
-
-        return mapToResponse(product);
     }
 }

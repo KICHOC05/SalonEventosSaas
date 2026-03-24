@@ -1,4 +1,3 @@
-// src/main/java/com/example/demo/order/repository/OrderItemRepository.java
 package com.example.demo.order.repository;
 
 import com.example.demo.order.model.OrderItem;
@@ -18,9 +17,6 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
 
     Optional<OrderItem> findByPublicIdAndOrder_PublicId(String publicId, String orderPublicId);
 
-    // ═══════════════════════════════════════
-    // TOP PRODUCTOS
-    // ═══════════════════════════════════════
 
     @Query("""
                 SELECT oi.product.publicId, oi.product.name,
@@ -39,9 +35,6 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end);
 
-    // ═══════════════════════════════════════
-    // TOP PAQUETES
-    // ═══════════════════════════════════════
 
     @Query("""
                 SELECT oi.product.publicId, oi.product.name,
@@ -60,9 +53,6 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end);
 
-    // ═══════════════════════════════════════
-    // TODOS LOS ITEMS VENDIDOS
-    // ═══════════════════════════════════════
 
     @Query("""
                 SELECT oi.product.publicId, oi.product.name,

@@ -19,7 +19,6 @@ public class Branch {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // 🔐 UUID público
     @Column(name = "public_id", nullable = false, unique = true, updatable = false)
     private String publicId;
 

@@ -1,4 +1,3 @@
-// src/main/java/com/example/demo/dashboard/dto/DashboardResponse.java
 package com.example.demo.dashboard.dto;
 
 import lombok.Builder;

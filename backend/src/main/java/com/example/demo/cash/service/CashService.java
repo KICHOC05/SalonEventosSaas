@@ -1,4 +1,3 @@
-// src/main/java/com/example/demo/cash/service/CashService.java
 package com.example.demo.cash.service;
 
 import com.example.demo.cash.dto.*;
@@ -31,9 +30,6 @@ public class CashService {
     private final BranchRepository branchRepository;
     private final UserRepository userRepository;
 
-    // ═══════════════════════════════════════
-    // ABRIR CAJA
-    // ═══════════════════════════════════════
 
     public CashRegisterResponse openCash(OpenCashRequest request) {
 
@@ -45,7 +41,6 @@ public class CashService {
         Long branchId = TenantContext.getBranchId();
         Long userId = TenantContext.getUserId();
 
-        // Verificar que no haya caja abierta
         cashRegisterRepository
                 .findByBranch_IdAndStatus(branchId, CashStatus.OPEN)
                 .ifPresent(c -> {
@@ -72,9 +67,6 @@ public class CashService {
         return mapToResponse(cash, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
     }
 
-    // ═══════════════════════════════════════
-    // ESTADO ACTUAL
-    // ═══════════════════════════════════════
 
     public CashRegisterResponse currentCash() {
 
@@ -82,9 +74,6 @@ public class CashService {
         return buildResponseWithSales(cash);
     }
 
-    // ═══════════════════════════════════════
-    // CERRAR CAJA
-    // ═══════════════════════════════════════
 
     public CashRegisterResponse closeCash(CloseCashRequest request) {
 
@@ -99,15 +88,12 @@ public class CashService {
         LocalDateTime end = LocalDateTime.now();
         Long branchId = cash.getBranch().getId();
 
-        // Obtener ventas por método
         BigDecimal cashSales = safe(paymentRepository.sumCashPayments(branchId, start, end));
         BigDecimal cardSales = safe(paymentRepository.sumCardPayments(branchId, start, end));
         BigDecimal transferSales = safe(paymentRepository.sumTransferPayments(branchId, start, end));
 
-        // 🔥 Expected cash = apertura + SOLO ventas en efectivo
         BigDecimal expectedCash = cash.getOpeningAmount().add(cashSales);
 
-        // Diferencia = contado - esperado en efectivo
         BigDecimal difference = request.getCountedCash().subtract(expectedCash);
 
         User user = userRepository.findById(userId)
@@ -125,9 +111,6 @@ public class CashService {
         return mapToResponse(cash, cashSales, cardSales, transferSales);
     }
 
-    // ═══════════════════════════════════════
-    // HELPERS
-    // ═══════════════════════════════════════
 
     private CashRegister getOpenCashRegister() {
         Long branchId = TenantContext.getBranchId();
@@ -169,15 +152,13 @@ public class CashService {
         response.setPublicId(cash.getPublicId());
         response.setOpeningAmount(cash.getOpeningAmount());
 
-        // Desglose por método
         response.setCashSales(cashSales);
         response.setCardSales(cardSales);
         response.setTransferSales(transferSales);
 
-        // Totales
         response.setSalesTotal(totalSales);
-        response.setExpectedCash(expectedCash); // apertura + solo efectivo
-        response.setExpectedAmount(cash.getOpeningAmount().add(totalSales)); // legacy
+        response.setExpectedCash(expectedCash);
+        response.setExpectedAmount(cash.getOpeningAmount().add(totalSales));
 
         response.setCountedAmount(cash.getClosingAmount());
         response.setDifference(cash.getDifference());

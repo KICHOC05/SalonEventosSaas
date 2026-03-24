@@ -1,4 +1,3 @@
-// src/main/java/com/example/demo/payment/dto/PaymentResponse.java
 package com.example.demo.payment.dto;
 
 import lombok.Builder;
@@ -14,8 +13,7 @@ public class PaymentResponse {
     private BigDecimal remainingAmount;
     private BigDecimal change;
 
-    // Detalle del pago actual
-    private BigDecimal amountReceived;   // Lo que dio el cliente
-    private BigDecimal amountApplied;    // Lo que se registró
-    private String paymentMethod;        // CASH, CARD, TRANSFER
+    private BigDecimal amountReceived;
+    private BigDecimal amountApplied;
+    private String paymentMethod;
 }

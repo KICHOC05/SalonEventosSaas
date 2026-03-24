@@ -1,4 +1,3 @@
-// src/main/java/com/example/demo/dashboard/controller/DashboardController.java
 package com.example.demo.dashboard.controller;
 
 import com.example.demo.dashboard.dto.DashboardResponse;

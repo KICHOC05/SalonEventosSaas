@@ -16,7 +16,6 @@ import java.util.Map;
 @Slf4j
 public class GlobalExceptionHandler {
 
-        // Entidad no encontrada
         @ExceptionHandler(EntityNotFoundException.class)
         public ResponseEntity<?> handleNotFound(EntityNotFoundException ex) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -27,7 +26,6 @@ public class GlobalExceptionHandler {
                                                 "message", ex.getMessage()));
         }
 
-        // Errores de validación de negocio (imagen inválida, tamaño, etc.)
         @ExceptionHandler(IllegalArgumentException.class)
         public ResponseEntity<?> handleBadRequest(IllegalArgumentException ex) {
                 return ResponseEntity.badRequest()
@@ -38,7 +36,6 @@ public class GlobalExceptionHandler {
                                                 "message", ex.getMessage()));
         }
 
-        // Archivo demasiado grande
         @ExceptionHandler(MaxUploadSizeExceededException.class)
         public ResponseEntity<?> handleMaxSize(MaxUploadSizeExceededException ex) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -49,7 +46,6 @@ public class GlobalExceptionHandler {
                                                 "message", "El archivo excede el tamaño máximo permitido de 2MB"));
         }
 
-        // Errores de validación de @Valid en DTOs
         @ExceptionHandler(MethodArgumentNotValidException.class)
         public ResponseEntity<?> handleValidation(MethodArgumentNotValidException ex) {
                 String message = ex.getBindingResult()
@@ -66,7 +62,6 @@ public class GlobalExceptionHandler {
                                 "message", message));
         }
 
-        // Cualquier otro error genérico
         @ExceptionHandler(Exception.class)
         public ResponseEntity<?> handleGeneral(Exception ex) {
                 log.error("Error no manejado: ", ex);

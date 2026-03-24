@@ -1,4 +1,3 @@
-// src/main/java/com/example/demo/payment/service/PaymentService.java
 package com.example.demo.payment.service;
 
 import com.example.demo.branch.model.Branch;
@@ -23,7 +22,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -42,7 +40,6 @@ public class PaymentService {
         Long branchId = TenantContext.getBranchId();
         Long userId = TenantContext.getUserId();
 
-        // ── Validar orden ──
         Order order = orderRepository.findByPublicIdAndTenant_Id(orderPublicId, tenantId)
                 .orElseThrow(() -> new EntityNotFoundException("Orden no encontrada"));
 
@@ -53,7 +50,6 @@ public class PaymentService {
             throw new IllegalStateException("La orden está cancelada");
         }
 
-        // ── Calcular restante ──
         BigDecimal totalPaidBefore = paymentRepository.sumPaymentsByOrderId(order.getId());
         if (totalPaidBefore == null)
             totalPaidBefore = BigDecimal.ZERO;
@@ -68,12 +64,7 @@ public class PaymentService {
         BigDecimal change = BigDecimal.ZERO;
         BigDecimal amountToApply;
 
-        // ═══════════════════════════════════════
-        // 🔁 LÓGICA DE CAMBIO
-        // ═══════════════════════════════════════
-
         if (request.getPaymentMethod() == PaymentMethod.CASH) {
-            // CASH: puede pagar más del total → hay cambio
             if (amountReceived.compareTo(remaining) > 0) {
                 change = amountReceived.subtract(remaining);
                 amountToApply = remaining;
@@ -81,7 +72,6 @@ public class PaymentService {
                 amountToApply = amountReceived;
             }
         } else {
-            // CARD / TRANSFER: NO puede exceder el restante
             if (amountReceived.compareTo(remaining) > 0) {
                 throw new IllegalArgumentException(
                         "El monto con " + request.getPaymentMethod()
@@ -90,7 +80,6 @@ public class PaymentService {
             amountToApply = amountReceived;
         }
 
-        // ── Crear el pago ──
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new EntityNotFoundException("Tenant not found"));
         Branch branch = branchRepository.findById(branchId)
@@ -109,16 +98,16 @@ public class PaymentService {
 
         paymentRepository.save(payment);
 
-        // ── Actualizar estado de la orden ──
         BigDecimal totalPaidAfter = totalPaidBefore.add(amountToApply);
         BigDecimal newRemaining = order.getTotalAmount().subtract(totalPaidAfter);
 
-        if (newRemaining.compareTo(BigDecimal.ZERO) <= 0) {
-            order.setStatus(OrderStatus.CLOSED);
-            order.setClosedAt(LocalDateTime.now());
-        } else {
+        // ✅ SOLO marcar como PARTIALLY_PAID, NO cerrar aquí
+        // El frontend se encarga de llamar closeOrder() después
+        if (newRemaining.compareTo(BigDecimal.ZERO) > 0) {
             order.setStatus(OrderStatus.PARTIALLY_PAID);
         }
+        // Si newRemaining <= 0, dejamos el status actual (OPEN o PARTIALLY_PAID)
+        // para que closeOrder() lo cierre correctamente
         orderRepository.save(order);
 
         return PaymentResponse.builder()

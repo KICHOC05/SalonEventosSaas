@@ -48,8 +48,6 @@ public class OrderItem {
     @Column(nullable = false)
     private OrderItemStatus status = OrderItemStatus.ACTIVE;
 
-
-    // Solo para PACKAGE
     private LocalDate eventDate;
     private LocalTime startTime;
     private LocalTime endTime;

@@ -10,7 +10,7 @@ import lombok.Setter;
 public class LoginRequest {
 
     @NotBlank
-    private String tenantPublicId; // 🔥 IMPORTANTE
+    private String tenantPublicId;
 
     @Email
     @NotBlank

@@ -1,4 +1,3 @@
-// src/main/java/com/example/demo/payment/model/Payment.java
 package com.example.demo.payment.model;
 
 import com.example.demo.branch.model.Branch;
@@ -44,6 +43,12 @@ public class Payment {
 
     @Column(nullable = false, precision = 38, scale = 2)
     private BigDecimal amount;
+
+    @Column(name = "amount_received", precision = 38, scale = 2)
+    private BigDecimal amountReceived;
+
+    @Column(name = "change_amount", precision = 38, scale = 2)
+    private BigDecimal changeAmount;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method", nullable = false)

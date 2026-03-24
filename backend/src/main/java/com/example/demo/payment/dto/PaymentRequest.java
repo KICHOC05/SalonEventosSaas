@@ -1,4 +1,3 @@
-// src/main/java/com/example/demo/payment/dto/PaymentRequest.java
 package com.example.demo.payment.dto;
 
 import com.example.demo.common.enums.PaymentMethod;

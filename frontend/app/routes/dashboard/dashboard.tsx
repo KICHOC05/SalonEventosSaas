@@ -1,17 +1,19 @@
-// app/routes/dashboard.tsx
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router";
 import {
-    DollarSign,
-    CalendarCheck,
-    TrendingUp,
-    Package,
-    ArrowUp,
-    ArrowDown,
-    Users,
-    ShieldCheck,
-    AlertTriangle,
-    Loader2,
+  DollarSign,
+  CalendarCheck,
+  TrendingUp,
+  Package,
+  ArrowUp,
+  ArrowDown,
+  Users,
+  ShieldCheck,
+  AlertTriangle,
+  Loader2,
+  ExternalLink,
+  Clock,
+  Sparkles,
 } from "lucide-react";
 import { Line, Doughnut } from "react-chartjs-2";
 import "~/lib/chartSetup";
@@ -21,367 +23,414 @@ import { buildMeta } from "~/lib/meta";
 import { fetchDashboard, type DashboardData } from "~/lib/api";
 
 export function meta() {
-    return buildMeta("Dashboard", "Panel de control");
+  return buildMeta("Dashboard", "Panel de control");
 }
 
-/* ── Tarjeta de estadística ── */
-function StatCard({
-    title,
-    value,
-    icon: Icon,
-    iconBg,
-    iconColor,
-    footer,
-    delay,
-}: {
-    title: string;
-    value: string;
-    icon: React.ElementType;
-    iconBg: string;
-    iconColor: string;
-    footer?: React.ReactNode;
-    delay: number;
-}) {
-    return (
-        <div
-            className="card bg-base-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all animate-slide-up"
-            style={{ animationDelay: `${delay}ms` }}
-        >
-            <div className="card-body p-5">
-                <div className="flex items-center justify-between mb-2">
-                    <div>
-                        <p className="text-sm text-base-content/50">{title}</p>
-                        <h3 className="text-2xl font-bold">{value}</h3>
-                    </div>
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${iconBg}`}>
-                        <Icon className={`w-5 h-5 ${iconColor}`} />
-                    </div>
-                </div>
-                {footer && <div className="text-sm">{footer}</div>}
-            </div>
-        </div>
-    );
-}
-
-/* ── Formato de moneda ── */
 function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat("es-MX", {
-        style: "currency",
-        currency: "MXN",
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-    }).format(amount);
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
 
-/* ── Growth Badge ── */
-function GrowthBadge({ value, label }: { value: number; label: string }) {
-    const isPositive = value >= 0;
-    return (
-        <span className={`flex items-center gap-1 ${isPositive ? "text-success" : "text-error"}`}>
-            {isPositive ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
-            {Math.abs(value).toFixed(1)}%{" "}
-            <span className="text-base-content/50">{label}</span>
-        </span>
-    );
-}
+function StatCard({
+  title,
+  value,
+  icon: Icon,
+  gradient,
+  footer,
+  delay,
+}: {
+  title: string;
+  value: string;
+  icon: React.ElementType;
+  gradient: string;
+  footer?: React.ReactNode;
+  delay: number;
+}) {
+  return (
+    <div
+      className="card bg-base-100 shadow-sm border border-base-300/30 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group animate-slide-up overflow-hidden"
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <div className="card-body p-5 relative">
+        <div
+          className={`absolute -top-6 -right-6 w-24 h-24 rounded-full ${gradient} opacity-10 group-hover:opacity-20 transition-opacity blur-2xl`}
+        />
 
-/* ── Página Dashboard ── */
-export default function Dashboard() {
-    const [isClient, setIsClient] = useState(false);
-    const [data, setData] = useState<DashboardData | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    const { user, role, isAdmin, isManager } = useAuth();
-    const canViewUsers = isAdmin || isManager;
-
-    const loadDashboard = useCallback(async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const result = await fetchDashboard();
-            setData(result);
-        } catch (err: any) {
-            setError(err.message || "Error al cargar dashboard");
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        setIsClient(true);
-        loadDashboard();
-    }, [loadDashboard]);
-
-    // Auto-refresh cada 5 minutos
-    useEffect(() => {
-        const interval = setInterval(loadDashboard, 5 * 60 * 1000);
-        return () => clearInterval(interval);
-    }, [loadDashboard]);
-
-    // ── Chart data ──
-    const salesChartData = data
-        ? {
-              labels: data.salesChart.labels,
-              datasets: [
-                  {
-                      label: "Ventas ($)",
-                      data: data.salesChart.data,
-                      borderColor: "#06b6d4",
-                      backgroundColor: "rgba(6,182,212,0.1)",
-                      borderWidth: 2,
-                      fill: true,
-                      tension: 0.4,
-                  },
-              ],
-          }
-        : null;
-
-    const packagesChartData = data && data.topPackages.length > 0
-        ? {
-              labels: data.topPackages.map((p) => p.name),
-              datasets: [
-                  {
-                      data: data.topPackages.map((p) => p.quantitySold),
-                      backgroundColor: ["#06b6d4", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981"],
-                      borderWidth: 0,
-                  },
-              ],
-          }
-        : null;
-
-    if (loading && !data) {
-        return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                <span className="ml-3 text-base-content/60">Cargando dashboard...</span>
-            </div>
-        );
-    }
-
-    if (error && !data) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-                <AlertTriangle className="w-12 h-12 text-error" />
-                <p className="text-error">{error}</p>
-                <button className="btn btn-primary btn-sm" onClick={loadDashboard}>
-                    Reintentar
-                </button>
-            </div>
-        );
-    }
-
-    return (
-        <div className="space-y-6">
-            {/* ═══ SALUDO CON ROL ═══ */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold">
-                        Bienvenido, {user?.name || "Usuario"}
-                    </h1>
-                    <div className="flex items-center gap-2 mt-1">
-                        <ShieldCheck className="w-4 h-4 text-primary" />
-                        <span className="text-sm text-base-content/60">
-                            Rol: <span className="badge badge-sm badge-primary">{role}</span>
-                        </span>
-                        {user?.branchName && (
-                            <span className="text-sm text-base-content/60">
-                                • Sucursal: {user.branchName}
-                            </span>
-                        )}
-                    </div>
-                </div>
-                {loading && (
-                    <Loader2 className="w-5 h-5 animate-spin text-base-content/30" />
-                )}
-            </div>
-
-            {/* ═══ TARJETAS DE ESTADÍSTICAS ═══ */}
-            {data && (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                    <StatCard
-                        title="Ventas del día"
-                        value={formatCurrency(data.salesToday)}
-                        icon={DollarSign}
-                        iconBg="bg-primary/10"
-                        iconColor="text-primary"
-                        delay={100}
-                        footer={
-                            <GrowthBadge value={data.salesTodayGrowth} label="vs. ayer" />
-                        }
-                    />
-                    <StatCard
-                        title="Eventos programados"
-                        value={String(data.scheduledEventsCount)}
-                        icon={CalendarCheck}
-                        iconBg="bg-secondary/10"
-                        iconColor="text-secondary"
-                        delay={200}
-                        footer={<span className="text-base-content/50">Próximamente</span>}
-                    />
-                    <StatCard
-                        title="Ingresos del mes"
-                        value={formatCurrency(data.monthlyRevenue)}
-                        icon={TrendingUp}
-                        iconBg="bg-accent/10"
-                        iconColor="text-accent"
-                        delay={300}
-                        footer={
-                            <GrowthBadge value={data.monthlyGrowth} label="vs. mes anterior" />
-                        }
-                    />
-                    <StatCard
-                        title="Productos en inventario"
-                        value={String(data.inventory.totalProducts)}
-                        icon={Package}
-                        iconBg="bg-success/10"
-                        iconColor="text-success"
-                        delay={400}
-                        footer={
-                            data.inventory.lowStockCount > 0 ? (
-                                <span className="text-error">
-                                    {data.inventory.lowStockCount} producto{data.inventory.lowStockCount > 1 ? "s" : ""} con stock bajo
-                                </span>
-                            ) : (
-                                <span className="text-success">Stock OK</span>
-                            )
-                        }
-                    />
-                </div>
-            )}
-
-            {/* ═══ GRÁFICAS ═══ */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="card bg-base-100 shadow-sm">
-                    <div className="card-body">
-                        <h3 className="card-title text-base">Ventas de la semana</h3>
-                        <div className="chart-container">
-                            {isClient && salesChartData && (
-                                <Line data={salesChartData} options={darkGridOptions as any} />
-                            )}
-                            {(!salesChartData || !isClient) && (
-                                <div className="flex items-center justify-center h-64 text-base-content/30">
-                                    Sin datos
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="card bg-base-100 shadow-sm">
-                    <div className="card-body">
-                        <h3 className="card-title text-base">Paquetes más vendidos</h3>
-                        <div className="chart-container">
-                            {isClient && packagesChartData && (
-                                <Doughnut
-                                    data={packagesChartData}
-                                    options={darkDoughnutOptions as any}
-                                />
-                            )}
-                            {(!packagesChartData || !isClient) && (
-                                <div className="flex items-center justify-center h-64 text-base-content/30">
-                                    Sin datos de paquetes
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* ═══ PRODUCTOS CON STOCK BAJO ═══ */}
-            {data && data.inventory.lowStockProducts.length > 0 && (
-                <div className="card bg-base-100 shadow-sm border-l-4 border-warning">
-                    <div className="card-body">
-                        <div className="flex items-center gap-2 mb-3">
-                            <AlertTriangle className="w-5 h-5 text-warning" />
-                            <h3 className="card-title text-base">Productos con stock bajo</h3>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            {data.inventory.lowStockProducts.map((p) => (
-                                <div
-                                    key={p.publicId}
-                                    className="badge badge-warning badge-outline gap-1 p-3"
-                                >
-                                    {p.name}: {p.stock} uds
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ═══ SECCIÓN DE USUARIOS - SOLO ADMIN / MANAGER ═══ */}
-            {canViewUsers && (
-                <div className="card bg-base-100 shadow-sm">
-                    <div className="card-body">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2">
-                                <Users className="w-5 h-5 text-primary" />
-                                <h3 className="card-title text-base">
-                                    Gestión de Usuarios
-                                </h3>
-                            </div>
-                            <Link
-                                to="/dashboard/usuarios"
-                                className="btn btn-primary btn-sm"
-                            >
-                                Administrar usuarios
-                            </Link>
-                        </div>
-                        <p className="text-sm text-base-content/60">
-                            {isAdmin
-                                ? "Como administrador puedes crear, editar, desactivar y eliminar usuarios."
-                                : "Como manager puedes ver la lista de usuarios de tu sucursal."}
-                        </p>
-                    </div>
-                </div>
-            )}
-
-            {/* ═══ EVENTOS PRÓXIMOS (placeholder) ═══ */}
-            <div className="card bg-base-100 shadow-sm">
-                <div className="card-body">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="card-title text-base">Eventos próximos</h3>
-                        <Link to="/dashboard/eventos" className="link link-primary text-sm">
-                            Ver todos
-                        </Link>
-                    </div>
-                    {data && data.upcomingEvents.length > 0 ? (
-                        <div className="overflow-x-auto">
-                            <table className="table">
-                                <thead>
-                                    <tr>
-                                        <th>Fecha</th>
-                                        <th>Cliente</th>
-                                        <th>Paquete</th>
-                                        <th>Niños</th>
-                                        <th>Estado</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {data.upcomingEvents.map((ev, idx) => (
-                                        <tr key={idx} className="hover">
-                                            <td>{ev.date}</td>
-                                            <td>{ev.client}</td>
-                                            <td>{ev.packageName}</td>
-                                            <td>{ev.children}</td>
-                                            <td>
-                                                <span className="badge badge-sm badge-ghost">
-                                                    {ev.status}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    ) : (
-                        <p className="text-base-content/40 text-center py-8">
-                            No hay eventos próximos. El módulo de eventos estará disponible pronto.
-                        </p>
-                    )}
-                </div>
-            </div>
+        <div className="flex items-start justify-between relative">
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-base-content/40 uppercase tracking-wider">
+              {title}
+            </p>
+            <h3 className="text-2xl font-extrabold tracking-tight">{value}</h3>
+          </div>
+          <div
+            className={`w-11 h-11 rounded-xl ${gradient} flex items-center justify-center shadow-lg shadow-primary/10`}
+          >
+            <Icon className="w-5 h-5 text-white" />
+          </div>
         </div>
+        {footer && <div className="text-xs mt-3 pt-3 border-t border-base-300/30">{footer}</div>}
+      </div>
+    </div>
+  );
+}
+
+function GrowthBadge({ value, label }: { value: number; label: string }) {
+  const isPositive = value >= 0;
+  return (
+    <span className="flex items-center gap-1">
+      <span
+        className={`
+          inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-bold
+          ${isPositive ? "bg-success/15 text-success" : "bg-error/15 text-error"}
+        `}
+      >
+        {isPositive ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+        {Math.abs(value).toFixed(1)}%
+      </span>
+      <span className="text-base-content/40">{label}</span>
+    </span>
+  );
+}
+
+function ChartCard({
+  title,
+  children,
+  action,
+}: {
+  title: string;
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="card bg-base-100 shadow-sm border border-base-300/30">
+      <div className="card-body p-5">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-bold text-sm">{title}</h3>
+          {action}
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function EmptyChart({ message }: { message: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-64 text-base-content/20 gap-2">
+      <Sparkles className="w-8 h-8" />
+      <p className="text-sm">{message}</p>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    CONFIRMED: "badge-success",
+    PENDING: "badge-warning",
+    CANCELLED: "badge-error",
+  };
+  return (
+    <span className={`badge badge-sm ${map[status] || "badge-ghost"} font-medium`}>
+      {status}
+    </span>
+  );
+}
+
+export default function Dashboard() {
+  const [isClient, setIsClient] = useState(false);
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const { user, role, isAdmin, isManager } = useAuth();
+  const canViewUsers = isAdmin || isManager;
+
+  const loadDashboard = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await fetchDashboard();
+      setData(result);
+    } catch (err: any) {
+      setError(err.message || "Error al cargar dashboard");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    setIsClient(true);
+    loadDashboard();
+  }, [loadDashboard]);
+
+  useEffect(() => {
+    const interval = setInterval(loadDashboard, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [loadDashboard]);
+
+  const salesChartData = data
+    ? {
+        labels: data.salesChart.labels,
+        datasets: [
+          {
+            label: "Ventas ($)",
+            data: data.salesChart.data,
+            borderColor: "#06b6d4",
+            backgroundColor: "rgba(6,182,212,0.08)",
+            borderWidth: 2.5,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: "#06b6d4",
+            pointBorderColor: "#fff",
+            pointBorderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+          },
+        ],
+      }
+    : null;
+
+  const packagesChartData =
+    data && data.topPackages.length > 0
+      ? {
+          labels: data.topPackages.map((p) => p.name),
+          datasets: [
+            {
+              data: data.topPackages.map((p) => p.quantitySold),
+              backgroundColor: ["#06b6d4", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981"],
+              borderWidth: 0,
+              hoverOffset: 8,
+            },
+          ],
+        }
+      : null;
+
+  if (loading && !data) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <div className="relative">
+          <Loader2 className="w-10 h-10 animate-spin text-primary" />
+          <div className="absolute inset-0 animate-ping opacity-20">
+            <Loader2 className="w-10 h-10 text-primary" />
+          </div>
+        </div>
+        <p className="text-base-content/40 text-sm animate-pulse">Cargando dashboard...</p>
+      </div>
     );
+  }
+
+  if (error && !data) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center">
+          <AlertTriangle className="w-8 h-8 text-error" />
+        </div>
+        <p className="text-error font-medium">{error}</p>
+        <button className="btn btn-primary btn-sm gap-2" onClick={loadDashboard}>
+          Reintentar
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-extrabold">
+              Bienvenido, {user?.name?.split(" ")[0] || "Usuario"}
+            </h1>
+            <span className="text-2xl">👋</span>
+          </div>
+          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 text-sm text-base-content/50">
+              <ShieldCheck className="w-3.5 h-3.5 text-primary" />
+              <span className="badge badge-sm badge-primary badge-outline">{role}</span>
+            </span>
+            {user?.branchName && (
+              <span className="text-sm text-base-content/40 flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                {user.branchName}
+              </span>
+            )}
+          </div>
+        </div>
+        {loading && <Loader2 className="w-5 h-5 animate-spin text-base-content/20" />}
+      </div>
+
+      {data && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <StatCard
+            title="Ventas del día"
+            value={formatCurrency(data.salesToday)}
+            icon={DollarSign}
+            gradient="bg-gradient-to-br from-cyan-500 to-blue-600"
+            delay={0}
+            footer={<GrowthBadge value={data.salesTodayGrowth} label="vs. ayer" />}
+          />
+          <StatCard
+            title="Eventos programados"
+            value={String(data.scheduledEventsCount)}
+            icon={CalendarCheck}
+            gradient="bg-gradient-to-br from-violet-500 to-purple-600"
+            delay={75}
+            footer={<span className="text-base-content/40">Próximamente</span>}
+          />
+          <StatCard
+            title="Ingresos del mes"
+            value={formatCurrency(data.monthlyRevenue)}
+            icon={TrendingUp}
+            gradient="bg-gradient-to-br from-emerald-500 to-teal-600"
+            delay={150}
+            footer={<GrowthBadge value={data.monthlyGrowth} label="vs. mes anterior" />}
+          />
+          <StatCard
+            title="Productos en inventario"
+            value={String(data.inventory.totalProducts)}
+            icon={Package}
+            gradient="bg-gradient-to-br from-amber-500 to-orange-600"
+            delay={225}
+            footer={
+              data.inventory.lowStockCount > 0 ? (
+                <span className="text-error font-medium flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  {data.inventory.lowStockCount} con stock bajo
+                </span>
+              ) : (
+                <span className="text-success font-medium">✓ Stock OK</span>
+              )
+            }
+          />
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
+          <ChartCard title="Ventas de la semana">
+            <div className="h-72 mt-2">
+              {isClient && salesChartData ? (
+                <Line
+                  data={salesChartData}
+                  options={{ ...darkGridOptions, maintainAspectRatio: false, responsive: true } as any}
+                />
+              ) : (
+                <EmptyChart message="Sin datos de ventas" />
+              )}
+            </div>
+          </ChartCard>
+        </div>
+        <ChartCard title="Paquetes más vendidos">
+          <div className="h-72 flex items-center justify-center mt-2">
+            {isClient && packagesChartData ? (
+              <Doughnut
+                data={packagesChartData}
+                options={{ ...darkDoughnutOptions, maintainAspectRatio: false, responsive: true } as any}
+              />
+            ) : (
+              <EmptyChart message="Sin datos" />
+            )}
+          </div>
+        </ChartCard>
+      </div>
+
+      {data && data.inventory.lowStockProducts.length > 0 && (
+        <div className="card bg-gradient-to-r from-warning/5 to-transparent border border-warning/20 shadow-sm">
+          <div className="card-body p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-warning/15 flex items-center justify-center">
+                <AlertTriangle className="w-4 h-4 text-warning" />
+              </div>
+              <h3 className="font-bold text-sm">Productos con stock bajo</h3>
+              <span className="badge badge-warning badge-sm">{data.inventory.lowStockProducts.length}</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {data.inventory.lowStockProducts.map((p) => (
+                <div
+                  key={p.publicId}
+                  className="inline-flex items-center gap-2 bg-warning/10 border border-warning/20 rounded-lg px-3 py-1.5 text-sm"
+                >
+                  <span className="font-medium">{p.name}</span>
+                  <span className="badge badge-warning badge-xs">{p.stock} uds</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {canViewUsers && (
+        <div className="card bg-base-100 shadow-sm border border-base-300/30">
+          <div className="card-body p-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <Users className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm">Gestión de Usuarios</h3>
+                  <p className="text-xs text-base-content/40 mt-0.5">
+                    {isAdmin
+                      ? "Crear, editar y gestionar accesos"
+                      : "Ver usuarios de tu sucursal"}
+                  </p>
+                </div>
+              </div>
+              <Link to="/dashboard/usuarios" className="btn btn-primary btn-sm gap-1.5">
+                Administrar
+                <ExternalLink className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ChartCard
+        title="Eventos próximos"
+        action={
+          <Link to="/dashboard/eventos" className="btn btn-ghost btn-xs text-primary gap-1">
+            Ver todos <ExternalLink className="w-3 h-3" />
+          </Link>
+        }
+      >
+        {data && data.upcomingEvents.length > 0 ? (
+          <div className="overflow-x-auto -mx-5 mt-2">
+            <table className="table table-sm">
+              <thead>
+                <tr className="text-xs uppercase text-base-content/40">
+                  <th>Fecha</th>
+                  <th>Cliente</th>
+                  <th>Paquete</th>
+                  <th className="text-center">Niños</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.upcomingEvents.map((ev, idx) => (
+                  <tr key={idx} className="hover:bg-base-200/50 transition-colors">
+                    <td className="font-medium text-sm">{ev.date}</td>
+                    <td className="text-sm">{ev.client}</td>
+                    <td>
+                      <span className="badge badge-ghost badge-sm">{ev.packageName}</span>
+                    </td>
+                    <td className="text-center font-bold text-sm">{ev.children}</td>
+                    <td>
+                      <StatusBadge status={ev.status} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyChart message="No hay eventos próximos" />
+        )}
+      </ChartCard>
+    </div>
+  );
 }
