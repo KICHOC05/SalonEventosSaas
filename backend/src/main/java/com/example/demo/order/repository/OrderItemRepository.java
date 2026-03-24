@@ -3,6 +3,7 @@ package com.example.demo.order.repository;
 import com.example.demo.order.model.OrderItem;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -13,5 +14,10 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
     Optional<OrderItem> findByPublicId(String publicId);
 
     Optional<OrderItem> findByPublicIdAndOrder_PublicId(String publicId, String orderPublicId);
+
+       List<OrderItem> findByActiveTrueAndSessionEndBeforeAndOrder_Tenant_Id(
+            LocalDateTime now,
+            Long tenantId
+       );
 
 }

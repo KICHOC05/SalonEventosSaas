@@ -1,12 +1,14 @@
 package com.example.demo.product.service;
 
 import com.example.demo.common.context.TenantContext;
+import com.example.demo.common.enums.ProductType;
 import com.example.demo.product.dto.ProductRequest;
 import com.example.demo.product.dto.ProductResponse;
 import com.example.demo.product.model.Product;
 import com.example.demo.product.repository.ProductRepository;
 import com.example.demo.tenant.model.Tenant;
 import com.example.demo.tenant.repository.TenantRepository;
+
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,8 +22,12 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final TenantRepository tenantRepository;
 
+    // =========================
     // 🔹 CREATE
+    // =========================
     public ProductResponse create(ProductRequest request) {
+
+        validateRequest(request);
 
         Long tenantId = TenantContext.getTenantId();
 
@@ -29,20 +35,25 @@ public class ProductService {
                 .orElseThrow(() -> new EntityNotFoundException("Tenant not found"));
 
         Product product = new Product();
+
         product.setTenant(tenant);
         product.setName(request.getName());
         product.setDescription(request.getDescription());
         product.setPrice(request.getPrice());
-        product.setStock(request.getStock());
         product.setType(request.getType());
+        product.setDepartment(request.getDepartment());
         product.setActive(true);
+
+        applyBusinessRules(product, request);
 
         productRepository.save(product);
 
         return mapToResponse(product);
     }
 
-    // 🔹 FIND ALL (activos e inactivos)
+    // =========================
+    // 🔹 FIND ALL
+    // =========================
     public List<ProductResponse> findAll() {
 
         Long tenantId = TenantContext.getTenantId();
@@ -53,7 +64,9 @@ public class ProductService {
                 .toList();
     }
 
+    // =========================
     // 🔹 FIND BY PUBLIC ID
+    // =========================
     public ProductResponse findByPublicId(String publicId) {
 
         Long tenantId = TenantContext.getTenantId();
@@ -65,8 +78,12 @@ public class ProductService {
         return mapToResponse(product);
     }
 
+    // =========================
     // 🔹 UPDATE
+    // =========================
     public ProductResponse update(String publicId, ProductRequest request) {
+
+        validateRequest(request);
 
         Long tenantId = TenantContext.getTenantId();
 
@@ -77,15 +94,19 @@ public class ProductService {
         product.setName(request.getName());
         product.setDescription(request.getDescription());
         product.setPrice(request.getPrice());
-        product.setStock(request.getStock());
         product.setType(request.getType());
+        product.setDepartment(request.getDepartment());
+
+        applyBusinessRules(product, request);
 
         productRepository.save(product);
 
         return mapToResponse(product);
     }
 
-    // 🔹 DELETE (soft)
+    // =========================
+    // 🔹 DELETE (SOFT)
+    // =========================
     public void delete(String publicId) {
 
         Long tenantId = TenantContext.getTenantId();
@@ -99,9 +120,102 @@ public class ProductService {
         productRepository.save(product);
     }
 
+    // =========================
+    // 🔹 TOGGLE STATUS
+    // =========================
+    public ProductResponse toggleStatus(String publicId) {
+
+        Long tenantId = TenantContext.getTenantId();
+
+        Product product = productRepository
+                .findByPublicIdAndTenant_Id(publicId, tenantId)
+                .orElseThrow(() -> new EntityNotFoundException("Product not found"));
+
+        product.setActive(!product.getActive());
+
+        productRepository.save(product);
+
+        return mapToResponse(product);
+    }
+
+    // =========================
+    // 🔥 VALIDACIONES
+    // =========================
+    private void validateRequest(ProductRequest request) {
+
+        if (request.getName() == null || request.getName().isBlank()) {
+            throw new IllegalStateException("El nombre es obligatorio");
+        }
+
+        if (request.getPrice() == null) {
+            throw new IllegalStateException("El precio es obligatorio");
+        }
+
+        if (request.getType() == null) {
+            throw new IllegalStateException("El tipo de producto es obligatorio");
+        }
+    }
+
+    // =========================
+    // 🔥 BUSINESS RULES
+    // =========================
+    private void applyBusinessRules(Product product, ProductRequest request) {
+
+        ProductType type = request.getType();
+
+        // =========================
+        // SERVICE → TIMER
+        // =========================
+        if (ProductType.SERVICE.equals(type)) {
+
+            if (request.getDurationMinutes() == null || request.getDurationMinutes() <= 0) {
+                throw new IllegalStateException("SERVICE requiere durationMinutes válido");
+            }
+
+            product.setDurationMinutes(request.getDurationMinutes());
+            product.setRequiresSchedule(null);
+            product.setStock(null);
+
+        }
+
+        // =========================
+        // PACKAGE → EVENTO
+        // =========================
+        else if (ProductType.PACKAGE.equals(type)) {
+
+            product.setRequiresSchedule(
+                    request.getRequiresSchedule() != null
+                            ? request.getRequiresSchedule()
+                            : true
+            );
+
+            product.setDurationMinutes(null);
+            product.setStock(null);
+
+        }
+
+        // =========================
+        // PRODUCT → INVENTARIO
+        // =========================
+        else {
+
+            if (request.getStock() == null) {
+                throw new IllegalStateException("PRODUCT requiere stock");
+            }
+
+            product.setStock(request.getStock());
+            product.setDurationMinutes(null);
+            product.setRequiresSchedule(null);
+        }
+    }
+
+    // =========================
+    // 🔹 MAPPER
+    // =========================
     private ProductResponse mapToResponse(Product product) {
 
         ProductResponse response = new ProductResponse();
+
         response.setPublicId(product.getPublicId());
         response.setName(product.getName());
         response.setDescription(product.getDescription());
@@ -111,24 +225,10 @@ public class ProductService {
         response.setActive(product.getActive());
         response.setCreatedAt(product.getCreatedAt());
         response.setUpdatedAt(product.getUpdatedAt());
+        response.setDurationMinutes(product.getDurationMinutes());
+        response.setDepartment(product.getDepartment());
+        response.setRequiresSchedule(product.getRequiresSchedule());
 
         return response;
-    }
-
-    // 🔹 TOGGLE STATUS (activar/desactivar)
-    public ProductResponse toggleStatus(String publicId) {
-
-        Long tenantId = TenantContext.getTenantId();
-
-        // Buscar incluyendo inactivos (sin filtro de active)
-        Product product = productRepository
-                .findByPublicIdAndTenant_Id(publicId, tenantId)
-                .orElseThrow(() -> new EntityNotFoundException("Product not found"));
-
-        // Invertir el estado
-        product.setActive(!product.getActive());
-        productRepository.save(product);
-
-        return mapToResponse(product);
     }
 }

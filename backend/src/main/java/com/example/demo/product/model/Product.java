@@ -70,4 +70,13 @@ public class Product {
 
     @Column(nullable = false)
     private Boolean active = true;
+
+    @Column(nullable = false, length = 100)
+    private String department;
+
+    // SOLO para HOURLY
+    private Integer durationMinutes;
+
+    // SOLO para EVENT
+    private Boolean requiresSchedule;
 }

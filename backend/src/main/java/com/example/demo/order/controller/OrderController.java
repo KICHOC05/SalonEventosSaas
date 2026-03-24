@@ -3,6 +3,7 @@ package com.example.demo.order.controller;
 import com.example.demo.order.dto.*;
 import com.example.demo.order.service.OrderService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,18 +14,32 @@ public class OrderController {
 
     private final OrderService orderService;
 
+    // =========================
+    // CREATE ORDER
+    // =========================
+
     @PostMapping
-    public OrderResponse createOrder(@RequestBody OrderCreateRequest request) {
+    public OrderResponse createOrder(
+            @Valid @RequestBody OrderCreateRequest request) {
+
         return orderService.createOrder(request);
     }
+
+    // =========================
+    // ADD ITEM (TIMER)
+    // =========================
 
     @PostMapping("/{orderPublicId}/items")
     public OrderResponse addItem(
             @PathVariable String orderPublicId,
-            @RequestBody OrderItemRequest request) {
+            @Valid @RequestBody OrderItemRequest request) {
 
         return orderService.addItem(orderPublicId, request);
     }
+
+    // =========================
+    // VOID ITEM
+    // =========================
 
     @PostMapping("/{orderPublicId}/items/{itemPublicId}/void")
     public OrderResponse voidItem(
@@ -34,27 +49,49 @@ public class OrderController {
         return orderService.voidItem(orderPublicId, itemPublicId);
     }
 
+    // =========================
+    // UPDATE ITEM QUANTITY
+    // =========================
+
     @PutMapping("/{orderPublicId}/items/{itemPublicId}")
     public OrderResponse updateItemQuantity(
             @PathVariable String orderPublicId,
             @PathVariable String itemPublicId,
-            @RequestBody UpdateOrderItemRequest request) {
+            @Valid @RequestBody UpdateOrderItemRequest request) {
 
         return orderService.updateItemQuantity(orderPublicId, itemPublicId, request);
     }
 
+    // =========================
+    // GET ORDER
+    // =========================
+
     @GetMapping("/{orderPublicId}")
-    public OrderResponse getOrder(@PathVariable String orderPublicId) {
+    public OrderResponse getOrder(
+            @PathVariable String orderPublicId) {
+
         return orderService.getOrder(orderPublicId);
     }
 
+    // =========================
+    // CLOSE ORDER
+    // =========================
+
     @PostMapping("/{orderPublicId}/close")
-    public OrderResponse closeOrder(@PathVariable String orderPublicId) {
+    public OrderResponse closeOrder(
+            @PathVariable String orderPublicId) {
+
         return orderService.closeOrder(orderPublicId);
     }
 
+    // =========================
+    // CANCEL ORDER
+    // =========================
+
     @PostMapping("/{orderPublicId}/cancel")
-    public OrderResponse cancelOrder(@PathVariable String orderPublicId) {
+    public OrderResponse cancelOrder(
+            @PathVariable String orderPublicId) {
+
         return orderService.cancelOrder(orderPublicId);
     }
 }

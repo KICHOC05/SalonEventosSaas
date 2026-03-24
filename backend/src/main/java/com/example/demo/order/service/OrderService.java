@@ -2,6 +2,7 @@ package com.example.demo.order.service;
 
 import com.example.demo.security.TenantContext;
 import com.example.demo.common.enums.OrderStatus;
+import com.example.demo.common.enums.ProductType;
 import com.example.demo.common.enums.InventoryMode;
 import com.example.demo.common.enums.OrderItemStatus;
 import com.example.demo.order.dto.*;
@@ -133,6 +134,21 @@ public class OrderService {
         item.setQuantity(request.getQuantity());
         item.setUnitPrice(product.getPrice());
         item.setStatus(OrderItemStatus.ACTIVE);
+
+        // =========================
+        // HOURLY TIMER
+        // =========================
+
+    if (product.getType() == ProductType.SERVICE) {
+
+        LocalDateTime now = LocalDateTime.now();
+
+        item.setSessionStart(now);
+        item.setDurationMinutes(product.getDurationMinutes());
+
+        item.setSessionEnd(now.plusMinutes(product.getDurationMinutes()));
+        item.setActive(true);
+    }
 
         BigDecimal subtotal = product.getPrice()
                 .multiply(BigDecimal.valueOf(request.getQuantity()));
@@ -377,7 +393,11 @@ public class OrderService {
                     response.setSubtotal(item.getSubtotal());
                     response.setWarning(item.getWarning());
                     response.setStatus(item.getStatus().name());
-
+                    response.setDurationMinutes(item.getDurationMinutes());
+                    response.setActive(item.getActive());
+                    response.setSessionStart(item.getSessionStart());
+                    response.setSessionEnd(item.getSessionEnd());
+    
                     return response;
 
                 }).toList();
