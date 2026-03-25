@@ -17,7 +17,7 @@ public class OrderItemRequest {
     private LocalDate eventDate;
 
     private LocalTime startTime;
-    
+
     private LocalTime endTime;
 
 }

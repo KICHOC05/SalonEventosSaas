@@ -26,22 +26,16 @@ public class AuthService {
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
 
-    // ============================================================
-    // LOGIN (SaaS real: tenantPublicId + email)
-    // ============================================================
     public LoginResponse login(LoginRequest request) {
 
-        // 1️⃣ Buscar tenant por UUID público
         Tenant tenant = tenantRepository
                 .findByPublicId(request.getTenantPublicId())
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant no encontrado"));
 
-        // 2️⃣ Buscar usuario dentro del tenant
         User user = userRepository
                 .findByEmailAndTenant_Id(request.getEmail(), tenant.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
 
-        // 3️⃣ Validar password manualmente
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new BusinessException("Credenciales inválidas");
         }
@@ -50,7 +44,6 @@ public class AuthService {
             throw new BusinessException("Usuario desactivado");
         }
 
-        // 4️⃣ Generar JWT con UUID y enum real
         String token = jwtService.generateToken(
                 user.getPublicId(),
                 user.getEmail(),
@@ -72,9 +65,6 @@ public class AuthService {
                 .build();
     }
 
-    // ============================================================
-    // REGISTER (ADMIN del tenant)
-    // ============================================================
     @Transactional
     public LoginResponse register(RegisterRequest request, Long tenantId) {
 
@@ -93,7 +83,7 @@ public class AuthService {
         user.setName(request.getName());
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole(request.getRole()); // Enum directo
+        user.setRole(request.getRole());
         user.setTenant(tenant);
         user.setBranch(branch);
         user.setActive(true);

@@ -24,7 +24,6 @@ public class OrderResponse {
     private BigDecimal subtotal;
     private BigDecimal tax;
 
-
     private LocalDateTime createdAt;
 
     private LocalDateTime closedAt;

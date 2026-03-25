@@ -13,16 +13,58 @@ import java.math.BigDecimal;
 @Setter
 public class ProductRequest {
 
-    @NotBlank
-    private String name;
+	@NotBlank
+	private String name;
 
-    private String description;
+	private String description;
 
-    @NotNull
-    private BigDecimal price;
+	@NotNull
+	private BigDecimal price;
 
-    private Integer stock;
+	private Integer stock;
 
+	@NotNull
+	private ProductType type;
+
+	@NotBlank
+	private String department;
+
+	private Integer durationMinutes;
+
+	private Boolean requiresSchedule;
+
+	// getters y setters
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	public String getDescription() {
+		return description;
+	}
+
+	public void setDescription(String description) {
+		this.description = description;
+	}
+
+	public BigDecimal getPrice() {
+		return price;
+	}
+
+	public void setPrice(BigDecimal price) {
+		this.price = price;
+	}
+
+	public Integer getStock() {
+		return stock;
+	}
+
+	public void setStock(Integer stock) {
+		this.stock = stock;
+	}
     @NotNull
     private ProductType type;
 
@@ -31,6 +73,27 @@ public class ProductRequest {
 
     private Integer durationMinutes;
 
-    private Boolean requiresSchedule;
-    
+	public String getDepartment() {
+		return department;
+	}
+
+	public void setDepartment(String department) {
+		this.department = department;
+	}
+
+	public Integer getDurationMinutes() {
+		return durationMinutes;
+	}
+
+	public void setDurationMinutes(Integer durationMinutes) {
+		this.durationMinutes = durationMinutes;
+	}
+
+	public Boolean getRequiresSchedule() {
+		return requiresSchedule;
+	}
+
+	public void setRequiresSchedule(Boolean requiresSchedule) {
+		this.requiresSchedule = requiresSchedule;
+	}
 }

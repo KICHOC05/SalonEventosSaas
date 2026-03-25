@@ -8,8 +8,6 @@ public class TenantContext {
         return TENANT_TEST_ID;
     }
 
-	public static void setTenantId(long l) {
-		// TODO Auto-generated method stub
-		
+	public static void setTenantId(long l) {		
 	}
 }

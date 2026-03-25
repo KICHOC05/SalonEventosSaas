@@ -20,7 +20,6 @@ public class Tenant {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // 🔐 UUID público
     @Column(name = "public_id", nullable = false, unique = true, updatable = false)
     private String publicId;
 
@@ -35,6 +34,15 @@ public class Tenant {
     @Column(name = "business_name", nullable = false)
     private String businessName;
 
+    @Column(name = "phone")
+    private String phone;
+
+    @Column(name = "website")
+    private String website;
+
+    @Column(name = "logo_url")
+    private String logoUrl;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private TenantStatus status = TenantStatus.ACTIVE;
@@ -45,5 +53,4 @@ public class Tenant {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private InventoryMode inventoryMode = InventoryMode.WARNING;
-
 }

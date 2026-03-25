@@ -20,6 +20,14 @@ import {
   CheckCircle2,
   XCircle,
   Lock,
+  X,
+  Users,
+  Building2,
+  Mail,
+  Calendar,
+  MoreVertical,
+  Sparkles,
+  AlertTriangle,
 } from "lucide-react";
 import {
   fetchUsers,
@@ -38,31 +46,124 @@ import { useAuth } from "~/lib/auth";
 import { buildMeta } from "~/lib/meta";
 
 export function meta() {
-  return buildMeta("Usuarios", "Gestion de usuarios");
+  return buildMeta("Usuarios", "Gestión de usuarios");
 }
 
 type UserRole = "ADMIN" | "MANAGER" | "CASHIER" | "EMPLOYEE";
 
-const ROLE_LABELS: Record<UserRole, string> = {
-  ADMIN: "Administrador",
-  MANAGER: "Gerente",
-  CASHIER: "Cajero",
-  EMPLOYEE: "Empleado",
+const ROLE_CONFIG: Record<
+  UserRole,
+  {
+    label: string;
+    color: string;
+    bgColor: string;
+    textColor: string;
+    icon: typeof Shield;
+  }
+> = {
+  ADMIN: {
+    label: "Administrador",
+    color: "badge-error",
+    bgColor: "bg-error/10",
+    textColor: "text-error",
+    icon: ShieldAlert,
+  },
+  MANAGER: {
+    label: "Gerente",
+    color: "badge-warning",
+    bgColor: "bg-warning/10",
+    textColor: "text-warning",
+    icon: ShieldCheck,
+  },
+  CASHIER: {
+    label: "Cajero",
+    color: "badge-info",
+    bgColor: "bg-info/10",
+    textColor: "text-info",
+    icon: Shield,
+  },
+  EMPLOYEE: {
+    label: "Empleado",
+    color: "badge-ghost",
+    bgColor: "bg-base-200",
+    textColor: "text-base-content/60",
+    icon: User,
+  },
 };
 
-const ROLE_COLORS: Record<UserRole, string> = {
-  ADMIN: "badge-error",
-  MANAGER: "badge-warning",
-  CASHIER: "badge-info",
-  EMPLOYEE: "badge-ghost",
-};
 
-const ROLE_ICONS: Record<UserRole, typeof Shield> = {
-  ADMIN: ShieldAlert,
-  MANAGER: ShieldCheck,
-  CASHIER: Shield,
-  EMPLOYEE: User,
-};
+function UserAvatar({
+  name,
+  active = true,
+  size = "sm",
+}: {
+  name: string;
+  active?: boolean;
+  size?: "sm" | "md" | "lg";
+}) {
+  const initials = name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .substring(0, 2)
+    .toUpperCase();
+
+  const sizeClasses = {
+    sm: "w-9 h-9 text-xs",
+    md: "w-11 h-11 text-sm",
+    lg: "w-14 h-14 text-base",
+  };
+
+  return (
+    <div className={`avatar placeholder ${!active ? "opacity-50" : ""}`}>
+      <div
+        className={`
+          bg-gradient-to-br from-primary via-secondary to-accent
+          ${sizeClasses[size]} rounded-xl flex items-center justify-center
+          shadow-md shadow-primary/10
+        `}
+      >
+        <span className="text-white font-bold tracking-wide">{initials}</span>
+      </div>
+    </div>
+  );
+}
+
+function RoleBadge({ role }: { role: UserRole }) {
+  const config = ROLE_CONFIG[role];
+  const Icon = config.icon;
+
+  return (
+    <span
+      className={`
+        inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold
+        border ${config.bgColor} ${config.textColor} border-current/10
+      `}
+    >
+      <Icon className="w-3 h-3" />
+      {config.label}
+    </span>
+  );
+}
+
+function StatusIndicator({ active }: { active: boolean }) {
+  return (
+    <span
+      className={`
+        inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border
+        ${active
+          ? "bg-success/10 text-success border-success/20"
+          : "bg-error/10 text-error border-error/20"
+        }
+      `}
+    >
+      <span
+        className={`w-1.5 h-1.5 rounded-full ${active ? "bg-success animate-pulse" : "bg-error"}`}
+      />
+      {active ? "Activo" : "Inactivo"}
+    </span>
+  );
+}
 
 function PasswordInput({
   name,
@@ -80,30 +181,80 @@ function PasswordInput({
   onChange: (val: string) => void;
 }) {
   const [visible, setVisible] = useState(false);
+
+  const strength =
+    value.length === 0
+      ? 0
+      : value.length < 6
+        ? 1
+        : value.length < 10
+          ? 2
+          : 3;
+  const strengthColors = ["", "bg-error", "bg-warning", "bg-success"];
+  const strengthLabels = ["", "Débil", "Media", "Fuerte"];
+
   return (
-    <div className="relative">
-      <input
-        name={name}
-        type={visible ? "text" : "password"}
-        placeholder={placeholder}
-        className="input input-bordered w-full pr-10"
-        required={required}
-        minLength={minLength}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-      <button
-        type="button"
-        tabIndex={-1}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/40 hover:text-base-content/70 transition-colors"
-        onClick={() => setVisible((v) => !v)}
-      >
-        {visible ? (
-          <EyeOff className="w-4 h-4" />
-        ) : (
-          <Eye className="w-4 h-4" />
-        )}
-      </button>
+    <div className="space-y-1.5">
+      <div className="relative">
+        <input
+          name={name}
+          type={visible ? "text" : "password"}
+          placeholder={placeholder}
+          className="input input-bordered w-full pr-10"
+          required={required}
+          minLength={minLength}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/30 hover:text-base-content/60 transition-colors"
+          onClick={() => setVisible((v) => !v)}
+        >
+          {visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
+      </div>
+      {value.length > 0 && (
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1 flex-1">
+            {[1, 2, 3].map((level) => (
+              <div
+                key={level}
+                className={`h-1 flex-1 rounded-full transition-colors ${level <= strength ? strengthColors[strength] : "bg-base-300/50"
+                  }`}
+              />
+            ))}
+          </div>
+          <span className="text-[10px] text-base-content/40 font-medium">
+            {strengthLabels[strength]}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  color,
+  icon: Icon,
+}: {
+  label: string;
+  value: number | string;
+  color: string;
+  icon: React.ElementType;
+}) {
+  return (
+    <div className="flex items-center gap-3 bg-base-100 rounded-xl p-3.5 border border-base-300/30 hover:shadow-sm transition-shadow">
+      <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center flex-shrink-0`}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <div>
+        <p className="text-[10px] text-base-content/40 uppercase font-bold tracking-wider">{label}</p>
+        <p className="text-xl font-extrabold leading-tight">{value}</p>
+      </div>
     </div>
   );
 }
@@ -115,6 +266,94 @@ interface Toast {
   type: ToastType;
   message: string;
 }
+
+function ToastContainer({ toasts }: { toasts: Toast[] }) {
+  return (
+    <div className="toast toast-top toast-end z-[100] gap-2">
+      {toasts.map((toast) => (
+        <div
+          key={toast.id}
+          className={`
+            flex items-center gap-2 px-4 py-3 rounded-xl shadow-2xl border animate-slide-up
+            ${toast.type === "success"
+              ? "bg-success/10 border-success/20 text-success"
+              : "bg-error/10 border-error/20 text-error"
+            }
+          `}
+        >
+          {toast.type === "success" ? (
+            <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+          ) : (
+            <XCircle className="w-4 h-4 flex-shrink-0" />
+          )}
+          <span className="text-sm font-medium">{toast.message}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Modal({
+  dialogRef,
+  children,
+  maxWidth = "max-w-lg",
+}: {
+  dialogRef: React.RefObject<HTMLDialogElement | null>;
+  children: React.ReactNode;
+  maxWidth?: string;
+}) {
+  return (
+    <dialog ref={dialogRef} className="modal modal-bottom sm:modal-middle">
+      <div className={`modal-box rounded-t-3xl sm:rounded-2xl ${maxWidth} p-0 overflow-hidden`}>
+        {children}
+      </div>
+      <form method="dialog" className="modal-backdrop">
+        <button>close</button>
+      </form>
+    </dialog>
+  );
+}
+
+function ModalHeader({
+  icon: Icon,
+  iconColor,
+  title,
+  subtitle,
+  onClose,
+}: {
+  icon: React.ElementType;
+  iconColor: string;
+  title: string;
+  subtitle?: string;
+  onClose: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between p-6 pb-0">
+      <div className="flex items-center gap-3">
+        <div className={`w-10 h-10 rounded-xl ${iconColor} flex items-center justify-center`}>
+          <Icon className="w-5 h-5" />
+        </div>
+        <div>
+          <h3 className="font-extrabold text-lg">{title}</h3>
+          {subtitle && <p className="text-xs text-base-content/40">{subtitle}</p>}
+        </div>
+      </div>
+      <button className="btn btn-ghost btn-sm btn-circle" onClick={onClose}>
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
+function FormAlert({ message }: { message: string }) {
+  return (
+    <div className="flex items-center gap-2 px-4 py-2.5 bg-error/10 border border-error/20 rounded-xl text-error text-sm">
+      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
 
 export default function Usuarios() {
   const { role, isAdmin, isManager } = useAuth();
@@ -128,20 +367,18 @@ export default function Usuarios() {
 
   if (!isAdmin && !isManager) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-        <div className="bg-error/10 rounded-full p-6">
-          <Lock className="w-12 h-12 text-error" />
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-5">
+        <div className="w-20 h-20 rounded-2xl bg-error/10 flex items-center justify-center">
+          <Lock className="w-10 h-10 text-error" />
         </div>
-        <h2 className="text-xl font-bold text-error">Acceso Denegado</h2>
-        <p className="text-base-content/60 text-center max-w-md">
-          No tienes permisos para acceder a la gestión de usuarios.
-          <br />
-          Necesitas rol de <strong>Administrador</strong> o <strong>Gerente</strong>.
-        </p>
-        <button
-          className="btn btn-primary"
-          onClick={() => navigate("/dashboard")}
-        >
+        <div className="text-center space-y-2">
+          <h2 className="text-2xl font-extrabold text-error">Acceso Denegado</h2>
+          <p className="text-base-content/50 max-w-md text-sm">
+            Necesitas rol de <strong>Administrador</strong> o <strong>Gerente</strong> para
+            acceder a esta sección.
+          </p>
+        </div>
+        <button className="btn btn-primary gap-2" onClick={() => navigate("/dashboard")}>
           Volver al Dashboard
         </button>
       </div>
@@ -160,19 +397,8 @@ export default function Usuarios() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState<UserRole | "ALL">("ALL");
-  const [filterStatus, setFilterStatus] = useState<
-    "ALL" | "ACTIVE" | "INACTIVE"
-  >("ALL");
-
+  const [filterStatus, setFilterStatus] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
   const [toasts, setToasts] = useState<Toast[]>([]);
-
-  const showToast = (type: ToastType, message: string) => {
-    const id = Date.now();
-    setToasts((prev) => [...prev, { id, type, message }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4000);
-  };
 
   const createModalRef = useRef<HTMLDialogElement>(null);
   const createFormRef = useRef<HTMLFormElement>(null);
@@ -191,11 +417,18 @@ export default function Usuarios() {
 
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-
   const [createPassword, setCreatePassword] = useState("");
   const [createConfirmPassword, setCreateConfirmPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
+
+  const showToast = (type: ToastType, message: string) => {
+    const id = Date.now();
+    setToasts((prev) => [...prev, { id, type, message }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  };
 
   const resetCreateForm = () => {
     setCreatePassword("");
@@ -213,10 +446,7 @@ export default function Usuarios() {
     setLoading(true);
     setError(null);
     try {
-      const [usersData, branchesData] = await Promise.all([
-        fetchUsers(),
-        fetchBranches(),
-      ]);
+      const [usersData, branchesData] = await Promise.all([fetchUsers(), fetchBranches()]);
       setUsers(usersData);
       setBranches(branchesData);
     } catch (err: any) {
@@ -242,6 +472,7 @@ export default function Usuarios() {
       (filterStatus === "INACTIVE" && !u.active);
     return matchesSearch && matchesRole && matchesStatus;
   });
+
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -297,9 +528,7 @@ export default function Usuarios() {
 
     try {
       const updated = await updateUser(editingUser.publicId, request);
-      setUsers((prev) =>
-        prev.map((u) => (u.publicId === updated.publicId ? updated : u))
-      );
+      setUsers((prev) => prev.map((u) => (u.publicId === updated.publicId ? updated : u)));
       editModalRef.current?.close();
       setEditingUser(null);
       showToast("success", `Usuario "${updated.name}" actualizado`);
@@ -318,16 +547,12 @@ export default function Usuarios() {
       if (action === "deactivate") {
         await deactivateUser(user.publicId);
         setUsers((prev) =>
-          prev.map((u) =>
-            u.publicId === user.publicId ? { ...u, active: false } : u
-          )
+          prev.map((u) => (u.publicId === user.publicId ? { ...u, active: false } : u))
         );
         showToast("success", `Usuario "${user.name}" desactivado`);
       } else {
         const updated = await updateUser(user.publicId, { active: true });
-        setUsers((prev) =>
-          prev.map((u) => (u.publicId === updated.publicId ? updated : u))
-        );
+        setUsers((prev) => prev.map((u) => (u.publicId === updated.publicId ? updated : u)));
         showToast("success", `Usuario "${user.name}" activado`);
       }
       confirmModalRef.current?.close();
@@ -374,9 +599,7 @@ export default function Usuarios() {
     setSubmitting(true);
     try {
       await deleteUser(deletingUser.publicId);
-      setUsers((prev) =>
-        prev.filter((u) => u.publicId !== deletingUser.publicId)
-      );
+      setUsers((prev) => prev.filter((u) => u.publicId !== deletingUser.publicId));
       deleteModalRef.current?.close();
       showToast("success", `Usuario "${deletingUser.name}" eliminado`);
       setDeletingUser(null);
@@ -386,6 +609,7 @@ export default function Usuarios() {
       setSubmitting(false);
     }
   };
+
 
   const openCreate = () => {
     resetCreateForm();
@@ -402,10 +626,7 @@ export default function Usuarios() {
     passwordModalRef.current?.showModal();
   };
   const openConfirmToggle = (user: UserResponse) => {
-    setConfirmAction({
-      user,
-      action: user.active ? "deactivate" : "activate",
-    });
+    setConfirmAction({ user, action: user.active ? "deactivate" : "activate" });
     confirmModalRef.current?.showModal();
   };
   const openDelete = (user: UserResponse) => {
@@ -420,19 +641,27 @@ export default function Usuarios() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <span className="ml-3 text-lg">Cargando usuarios...</span>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <div className="relative">
+          <Loader2 className="w-10 h-10 animate-spin text-primary" />
+          <div className="absolute inset-0 animate-ping opacity-20">
+            <Loader2 className="w-10 h-10 text-primary" />
+          </div>
+        </div>
+        <p className="text-base-content/40 text-sm animate-pulse">Cargando usuarios...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-        <AlertCircle className="w-12 h-12 text-error" />
-        <p className="text-lg text-error">{error}</p>
-        <button className="btn btn-primary" onClick={loadData}>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <div className="w-16 h-16 rounded-2xl bg-error/10 flex items-center justify-center">
+          <AlertCircle className="w-8 h-8 text-error" />
+        </div>
+        <p className="text-error font-medium">{error}</p>
+        <button className="btn btn-primary btn-sm gap-2" onClick={loadData}>
+          <RefreshCw className="w-4 h-4" />
           Reintentar
         </button>
       </div>
@@ -441,294 +670,396 @@ export default function Usuarios() {
 
   return (
     <div className="space-y-6">
-      <div className="toast toast-top toast-end z-[100]">
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`alert ${toast.type === "success" ? "alert-success" : "alert-error"
-              } shadow-lg`}
-          >
-            {toast.type === "success" ? (
-              <CheckCircle2 className="w-5 h-5" />
-            ) : (
-              <XCircle className="w-5 h-5" />
-            )}
-            <span>{toast.message}</span>
-          </div>
-        ))}
-      </div>
+      <ToastContainer toasts={toasts} />
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">Gestión de Usuarios</h2>
-          <p className="text-base-content/60 text-sm mt-1">
-            {isAdmin
-              ? "Administra los usuarios de tu negocio"
-              : "Vista de usuarios de tu negocio (solo lectura)"}
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg shadow-primary/20">
+            <Users className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-extrabold">Usuarios</h2>
+            <p className="text-xs text-base-content/40">
+              {isAdmin ? "Administra los accesos de tu equipo" : "Vista de usuarios (solo lectura)"}
+            </p>
+          </div>
         </div>
         <div className="flex gap-2">
-          <button className="btn btn-ghost btn-sm gap-2" onClick={loadData}>
-            <RefreshCw className="w-4 h-4" /> Actualizar
+          <button
+            className="btn btn-ghost btn-sm gap-1.5 rounded-xl"
+            onClick={loadData}
+            disabled={loading}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            Actualizar
           </button>
           {canCreate && (
-            <button className="btn btn-primary gap-2" onClick={openCreate}>
-              <UserPlus className="w-4 h-4" /> Nuevo Usuario
+            <button
+              className="btn btn-primary gap-2 shadow-md shadow-primary/20"
+              onClick={openCreate}
+            >
+              <UserPlus className="w-4 h-4" />
+              Nuevo Usuario
             </button>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="stat bg-base-100 shadow-sm rounded-box p-4">
-          <div className="stat-title text-xs">Total</div>
-          <div className="stat-value text-2xl">{totalUsers}</div>
-        </div>
-        <div className="stat bg-base-100 shadow-sm rounded-box p-4">
-          <div className="stat-title text-xs">Activos</div>
-          <div className="stat-value text-2xl text-success">{activeUsers}</div>
-        </div>
-        <div className="stat bg-base-100 shadow-sm rounded-box p-4">
-          <div className="stat-title text-xs">Inactivos</div>
-          <div className="stat-value text-2xl text-error">{inactiveUsers}</div>
-        </div>
-        <div className="stat bg-base-100 shadow-sm rounded-box p-4">
-          <div className="stat-title text-xs">Admins</div>
-          <div className="stat-value text-2xl text-warning">{adminCount}</div>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard
+          label="Total"
+          value={totalUsers}
+          color="bg-primary/10 text-primary"
+          icon={Users}
+        />
+        <StatCard
+          label="Activos"
+          value={activeUsers}
+          color="bg-success/10 text-success"
+          icon={UserCheck}
+        />
+        <StatCard
+          label="Inactivos"
+          value={inactiveUsers}
+          color="bg-error/10 text-error"
+          icon={UserX}
+        />
+        <StatCard
+          label="Administradores"
+          value={adminCount}
+          color="bg-warning/10 text-warning"
+          icon={ShieldAlert}
+        />
       </div>
 
-      <div className="card bg-base-100 shadow-sm">
-        <div className="card-body py-4">
+      <div className="card bg-base-100 shadow-sm border border-base-300/30">
+        <div className="card-body p-4">
           <div className="flex flex-col sm:flex-row gap-3">
-            <label className="input input-bordered flex items-center gap-2 flex-1">
-              <Search className="w-4 h-4 opacity-50" />
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/30" />
               <input
                 type="text"
                 placeholder="Buscar por nombre, email o sucursal..."
-                className="grow"
+                className="input input-bordered w-full pl-10 rounded-xl"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-            </label>
-            <select
-              className="select select-bordered w-full sm:w-40"
-              value={filterRole}
-              onChange={(e) =>
-                setFilterRole(e.target.value as UserRole | "ALL")
-              }
-            >
-              <option value="ALL">Todos los roles</option>
-              {Object.entries(ROLE_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
+              {searchTerm && (
+                <button
+                  className="absolute right-3 top-1/2 -translate-y-1/2 btn btn-ghost btn-xs btn-circle"
+                  onClick={() => setSearchTerm("")}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex gap-1 bg-base-200/50 rounded-xl p-1 border border-base-300/30">
+              {(["ALL", "ADMIN", "MANAGER", "CASHIER", "EMPLOYEE"] as const).map((r) => (
+                <button
+                  key={r}
+                  className={`btn btn-sm rounded-lg text-xs ${filterRole === r ? "btn-primary" : "btn-ghost"
+                    }`}
+                  onClick={() => setFilterRole(r)}
+                >
+                  {r === "ALL" ? "Todos" : ROLE_CONFIG[r].label.substring(0, 5)}
+                </button>
               ))}
-            </select>
-            <select
-              className="select select-bordered w-full sm:w-40"
-              value={filterStatus}
-              onChange={(e) =>
-                setFilterStatus(
-                  e.target.value as "ALL" | "ACTIVE" | "INACTIVE"
-                )
-              }
-            >
-              <option value="ALL">Todos</option>
-              <option value="ACTIVE">Activos</option>
-              <option value="INACTIVE">Inactivos</option>
-            </select>
+            </div>
+
+            <div className="flex gap-1 bg-base-200/50 rounded-xl p-1 border border-base-300/30">
+              {(["ALL", "ACTIVE", "INACTIVE"] as const).map((s) => (
+                <button
+                  key={s}
+                  className={`btn btn-sm rounded-lg text-xs ${filterStatus === s ? "btn-primary" : "btn-ghost"
+                    }`}
+                  onClick={() => setFilterStatus(s)}
+                >
+                  {s === "ALL" ? "Todos" : s === "ACTIVE" ? "Activos" : "Inactivos"}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="card bg-base-100 shadow-sm">
-        <div className="card-body">
+      <div className="card bg-base-100 shadow-sm border border-base-300/30">
+        <div className="card-body p-0">
           {filteredUsers.length === 0 ? (
-            <div className="text-center py-12 text-base-content/50">
-              <User className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p className="text-lg">No se encontraron usuarios</p>
+            <div className="flex flex-col items-center justify-center py-20 text-base-content/30 gap-3">
+              <Sparkles className="w-12 h-12" />
+              <p className="font-semibold text-lg">No se encontraron usuarios</p>
               <p className="text-sm">
-                Intenta cambiar los filtros
-                {canCreate && " o crea un nuevo usuario"}
+                {searchTerm ? "Intenta con otra búsqueda" : canCreate ? "Crea tu primer usuario" : ""}
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Usuario</th>
-                    <th>Email</th>
-                    <th>Rol</th>
-                    <th>Sucursal</th>
-                    <th>Estado</th>
-                    <th>Creado</th>
-                    {isAdmin && <th className="text-right">Acciones</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredUsers.map((u) => {
-                    const RoleIcon = ROLE_ICONS[u.role];
-                    return (
-                      <tr key={u.publicId} className="hover">
+            <>
+              <div className="hidden lg:block overflow-x-auto">
+                <table className="table">
+                  <thead>
+                    <tr className="text-[11px] uppercase text-base-content/40">
+                      <th>Usuario</th>
+                      <th>Rol</th>
+                      <th>Sucursal</th>
+                      <th>Estado</th>
+                      <th>Registro</th>
+                      {isAdmin && <th className="text-right">Acciones</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.map((u) => (
+                      <tr
+                        key={u.publicId}
+                        className="hover:bg-base-200/30 transition-colors group"
+                      >
                         <td>
                           <div className="flex items-center gap-3">
-                            <div
-                              className={`avatar placeholder ${u.active ? "" : "opacity-50"
-                                }`}
-                            >
-                              <div className="bg-gradient-to-r from-primary to-secondary w-9 rounded-full flex items-center justify-center">
-                                <span className="text-xs text-white font-bold">
-                                  {u.name
-                                    .split(" ")
-                                    .map((n) => n[0])
-                                    .join("")
-                                    .substring(0, 2)
-                                    .toUpperCase()}
-                                </span>
-                              </div>
+                            <UserAvatar name={u.name} active={u.active} />
+                            <div className="min-w-0">
+                              <p
+                                className={`font-semibold text-sm truncate ${!u.active ? "opacity-50 line-through" : ""
+                                  }`}
+                              >
+                                {u.name}
+                              </p>
+                              <p className="text-xs text-base-content/40 truncate flex items-center gap-1">
+                                <Mail className="w-3 h-3" />
+                                {u.email}
+                              </p>
                             </div>
-                            <span
-                              className={`font-medium ${!u.active ? "opacity-50 line-through" : ""
-                                }`}
-                            >
-                              {u.name}
-                            </span>
                           </div>
-                        </td>
-                        <td className={!u.active ? "opacity-50" : ""}>
-                          {u.email}
                         </td>
                         <td>
-                          <div className="flex items-center gap-1.5">
-                            <RoleIcon className="w-3.5 h-3.5" />
-                            <span
-                              className={`badge badge-sm ${ROLE_COLORS[u.role]}`}
-                            >
-                              {ROLE_LABELS[u.role]}
-                            </span>
-                          </div>
-                        </td>
-                        <td className={!u.active ? "opacity-50" : ""}>
-                          {u.branchName}
+                          <RoleBadge role={u.role} />
                         </td>
                         <td>
                           <span
-                            className={`badge badge-sm ${u.active ? "badge-success" : "badge-error"
+                            className={`text-sm flex items-center gap-1 ${!u.active ? "opacity-50" : ""
                               }`}
                           >
-                            {u.active ? "Activo" : "Inactivo"}
+                            <Building2 className="w-3 h-3 text-base-content/30" />
+                            {u.branchName}
                           </span>
                         </td>
-                        <td className="text-sm text-base-content/60">
-                          {new Date(u.createdAt).toLocaleDateString("es-MX", {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          })}
+                        <td>
+                          <StatusIndicator active={u.active} />
                         </td>
-
+                        <td>
+                          <span className="text-xs text-base-content/40 flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {new Date(u.createdAt).toLocaleDateString("es-MX", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </span>
+                        </td>
                         {isAdmin && (
-                          <td className="text-right">
-                            <div className="flex justify-end gap-1">
+                          <td>
+                            <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               {canEdit && (
                                 <button
-                                  className="btn btn-ghost btn-xs btn-square tooltip"
+                                  className="btn btn-ghost btn-xs btn-square rounded-lg tooltip tooltip-left"
                                   data-tip="Editar"
                                   onClick={() => openEdit(u)}
                                 >
-                                  <Pencil className="w-4 h-4 text-warning" />
+                                  <Pencil className="w-3.5 h-3.5 text-warning" />
                                 </button>
                               )}
                               {canChangePassword && (
                                 <button
-                                  className="btn btn-ghost btn-xs btn-square tooltip"
-                                  data-tip="Cambiar contraseña"
+                                  className="btn btn-ghost btn-xs btn-square rounded-lg tooltip tooltip-left"
+                                  data-tip="Contraseña"
                                   onClick={() => openPasswordChange(u)}
                                 >
-                                  <KeyRound className="w-4 h-4 text-info" />
+                                  <KeyRound className="w-3.5 h-3.5 text-info" />
                                 </button>
                               )}
                               {canToggleStatus && (
                                 <button
-                                  className="btn btn-ghost btn-xs btn-square tooltip"
-                                  data-tip={
-                                    u.active ? "Desactivar" : "Activar"
-                                  }
+                                  className="btn btn-ghost btn-xs btn-square rounded-lg tooltip tooltip-left"
+                                  data-tip={u.active ? "Desactivar" : "Activar"}
                                   onClick={() => openConfirmToggle(u)}
                                 >
                                   {u.active ? (
-                                    <UserX className="w-4 h-4 text-error" />
+                                    <UserX className="w-3.5 h-3.5 text-error" />
                                   ) : (
-                                    <UserCheck className="w-4 h-4 text-success" />
+                                    <UserCheck className="w-3.5 h-3.5 text-success" />
                                   )}
                                 </button>
                               )}
                               {canDelete && (
                                 <button
-                                  className="btn btn-ghost btn-xs btn-square tooltip"
+                                  className="btn btn-ghost btn-xs btn-square rounded-lg tooltip tooltip-left"
                                   data-tip="Eliminar"
                                   onClick={() => openDelete(u)}
                                 >
-                                  <Trash2 className="w-4 h-4 text-error" />
+                                  <Trash2 className="w-3.5 h-3.5 text-error" />
                                 </button>
                               )}
                             </div>
                           </td>
                         )}
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="lg:hidden divide-y divide-base-300/30">
+                {filteredUsers.map((u) => (
+                  <div key={u.publicId} className="p-4 hover:bg-base-200/30 transition-colors">
+                    <div className="flex items-start gap-3">
+                      <UserAvatar name={u.name} active={u.active} size="md" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p
+                            className={`font-bold text-sm truncate ${!u.active ? "opacity-50 line-through" : ""
+                              }`}
+                          >
+                            {u.name}
+                          </p>
+                          {isAdmin && (
+                            <div className="dropdown dropdown-end">
+                              <div tabIndex={0} role="button" className="btn btn-ghost btn-xs btn-circle">
+                                <MoreVertical className="w-4 h-4" />
+                              </div>
+                              <ul
+                                tabIndex={0}
+                                className="dropdown-content menu bg-base-100 rounded-xl w-48 p-1.5 shadow-xl border border-base-300/50 z-50"
+                              >
+                                {canEdit && (
+                                  <li>
+                                    <button
+                                      onClick={() => openEdit(u)}
+                                      className="text-sm gap-2"
+                                    >
+                                      <Pencil className="w-3.5 h-3.5 text-warning" />
+                                      Editar
+                                    </button>
+                                  </li>
+                                )}
+                                {canChangePassword && (
+                                  <li>
+                                    <button
+                                      onClick={() => openPasswordChange(u)}
+                                      className="text-sm gap-2"
+                                    >
+                                      <KeyRound className="w-3.5 h-3.5 text-info" />
+                                      Contraseña
+                                    </button>
+                                  </li>
+                                )}
+                                {canToggleStatus && (
+                                  <li>
+                                    <button
+                                      onClick={() => openConfirmToggle(u)}
+                                      className="text-sm gap-2"
+                                    >
+                                      {u.active ? (
+                                        <>
+                                          <UserX className="w-3.5 h-3.5 text-error" />
+                                          Desactivar
+                                        </>
+                                      ) : (
+                                        <>
+                                          <UserCheck className="w-3.5 h-3.5 text-success" />
+                                          Activar
+                                        </>
+                                      )}
+                                    </button>
+                                  </li>
+                                )}
+                                {canDelete && (
+                                  <>
+                                    <div className="divider my-0.5" />
+                                    <li>
+                                      <button
+                                        onClick={() => openDelete(u)}
+                                        className="text-sm gap-2 text-error"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        Eliminar
+                                      </button>
+                                    </li>
+                                  </>
+                                )}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-xs text-base-content/40 truncate mt-0.5">{u.email}</p>
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          <RoleBadge role={u.role} />
+                          <StatusIndicator active={u.active} />
+                        </div>
+                        <div className="flex items-center gap-3 mt-2 text-xs text-base-content/40">
+                          <span className="flex items-center gap-1">
+                            <Building2 className="w-3 h-3" />
+                            {u.branchName}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {new Date(u.createdAt).toLocaleDateString("es-MX", {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
 
           {filteredUsers.length > 0 && (
-            <div className="text-sm text-base-content/50 mt-3">
+            <div className="px-5 py-3 border-t border-base-300/30 text-xs text-base-content/40">
               Mostrando {filteredUsers.length} de {totalUsers} usuarios
             </div>
           )}
         </div>
       </div>
 
+
       {isAdmin && (
         <>
-          <dialog ref={createModalRef} className="modal">
-            <div className="modal-box max-w-lg">
-              <form method="dialog">
-                <button className="btn btn-sm btn-circle btn-ghost absolute right-4 top-4">
-                  ✕
-                </button>
-              </form>
-              <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-primary" />
-                Nuevo Usuario
-              </h3>
-              {formError && (
-                <div className="alert alert-error mb-4">
-                  <AlertCircle className="w-4 h-4" />
-                  <span>{formError}</span>
-                </div>
-              )}
-              <form ref={createFormRef} onSubmit={handleCreate} className="space-y-4">
-                <label className="form-control w-full">
-                  <div className="label">
-                    <span className="label-text">Nombre completo</span>
-                  </div>
+          <Modal dialogRef={createModalRef}>
+            <ModalHeader
+              icon={UserPlus}
+              iconColor="bg-primary/10 text-primary"
+              title="Nuevo Usuario"
+              subtitle="Completa los datos del nuevo integrante"
+              onClose={() => {
+                createModalRef.current?.close();
+                createFormRef.current?.reset();
+                resetCreateForm();
+              }}
+            />
+            <div className="p-6 pt-4">
+              {formError && <FormAlert message={formError} />}
+              <form
+                ref={createFormRef}
+                onSubmit={handleCreate}
+                className="space-y-4 mt-3"
+              >
+                <fieldset className="fieldset">
+                  <legend className="fieldset-legend text-xs">Nombre completo</legend>
                   <input
                     name="name"
                     type="text"
-                    placeholder="Ej: Juan Pérez"
+                    placeholder="Juan Pérez"
                     className="input input-bordered w-full"
                     required
                   />
-                </label>
-                <label className="form-control w-full">
-                  <div className="label">
-                    <span className="label-text">Email</span>
-                  </div>
+                </fieldset>
+
+                <fieldset className="fieldset">
+                  <legend className="fieldset-legend text-xs flex items-center gap-1">
+                    <Mail className="w-3 h-3" /> Email
+                  </legend>
                   <input
                     name="email"
                     type="email"
@@ -736,57 +1067,81 @@ export default function Usuarios() {
                     className="input input-bordered w-full"
                     required
                   />
-                </label>
-                <div className="grid grid-cols-2 gap-4">
-                  <label className="form-control w-full">
-                    <div className="label">
-                      <span className="label-text">Rol</span>
-                    </div>
+                </fieldset>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <fieldset className="fieldset">
+                    <legend className="fieldset-legend text-xs flex items-center gap-1">
+                      <Shield className="w-3 h-3" /> Rol
+                    </legend>
                     <select name="role" className="select select-bordered w-full" required>
                       <option value="">Selecciona...</option>
-                      {Object.entries(ROLE_LABELS).map(([key, label]) => (
-                        <option key={key} value={key}>{label}</option>
+                      {Object.entries(ROLE_CONFIG).map(([key, config]) => (
+                        <option key={key} value={key}>
+                          {config.label}
+                        </option>
                       ))}
                     </select>
-                  </label>
-                  <label className="form-control w-full">
-                    <div className="label">
-                      <span className="label-text">Sucursal</span>
-                    </div>
+                  </fieldset>
+
+                  <fieldset className="fieldset">
+                    <legend className="fieldset-legend text-xs flex items-center gap-1">
+                      <Building2 className="w-3 h-3" /> Sucursal
+                    </legend>
                     <select name="branchId" className="select select-bordered w-full" required>
                       <option value="">Selecciona...</option>
                       {branches.map((b) => (
-                        <option key={b.id} value={b.id}>{b.name}</option>
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
                       ))}
                     </select>
-                  </label>
+                  </fieldset>
                 </div>
-                <div className="form-control w-full">
-                  <div className="label">
-                    <span className="label-text">Contraseña</span>
-                  </div>
+
+                <fieldset className="fieldset">
+                  <legend className="fieldset-legend text-xs">Contraseña</legend>
                   <PasswordInput
                     name="password"
                     placeholder="Mínimo 6 caracteres"
                     value={createPassword}
                     onChange={setCreatePassword}
                   />
-                </div>
-                <div className="form-control w-full">
-                  <div className="label">
-                    <span className="label-text">Confirmar contraseña</span>
-                  </div>
+                </fieldset>
+
+                <fieldset className="fieldset">
+                  <legend className="fieldset-legend text-xs">Confirmar contraseña</legend>
                   <PasswordInput
                     name="confirmPassword"
                     placeholder="Repite la contraseña"
                     value={createConfirmPassword}
                     onChange={setCreateConfirmPassword}
                   />
-                </div>
-                <div className="modal-action">
+                </fieldset>
+
+                {createPassword && createConfirmPassword && (
+                  <div
+                    className={`flex items-center gap-1.5 text-xs ${createPassword === createConfirmPassword
+                      ? "text-success"
+                      : "text-error"
+                      }`}
+                  >
+                    {createPassword === createConfirmPassword ? (
+                      <>
+                        <CheckCircle2 className="w-3 h-3" /> Las contraseñas coinciden
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="w-3 h-3" /> Las contraseñas no coinciden
+                      </>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-2">
                   <button
                     type="button"
-                    className="btn btn-ghost"
+                    className="btn btn-ghost flex-1"
                     onClick={() => {
                       createModalRef.current?.close();
                       createFormRef.current?.reset();
@@ -796,188 +1151,387 @@ export default function Usuarios() {
                   >
                     Cancelar
                   </button>
-                  <button type="submit" className="btn btn-primary" disabled={submitting}>
-                    {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                  <button
+                    type="submit"
+                    className="btn btn-primary flex-1 gap-2 shadow-md shadow-primary/20"
+                    disabled={submitting}
+                  >
+                    {submitting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <UserPlus className="w-4 h-4" />
+                    )}
                     Crear usuario
                   </button>
                 </div>
               </form>
             </div>
-            <form method="dialog" className="modal-backdrop">
-              <button>close</button>
-            </form>
-          </dialog>
+          </Modal>
 
-          <dialog ref={editModalRef} className="modal">
-            <div className="modal-box max-w-lg">
-              <form method="dialog">
-                <button className="btn btn-sm btn-circle btn-ghost absolute right-4 top-4">✕</button>
-              </form>
-              <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
-                <Pencil className="w-5 h-5 text-warning" />
-                Editar Usuario
-              </h3>
-              {formError && (
-                <div className="alert alert-error mb-4">
-                  <AlertCircle className="w-4 h-4" />
-                  <span>{formError}</span>
-                </div>
-              )}
+          <Modal dialogRef={editModalRef}>
+            <ModalHeader
+              icon={Pencil}
+              iconColor="bg-warning/10 text-warning"
+              title="Editar Usuario"
+              subtitle={editingUser?.email}
+              onClose={() => {
+                editModalRef.current?.close();
+                setEditingUser(null);
+                setFormError(null);
+              }}
+            />
+            <div className="p-6 pt-4">
+              {formError && <FormAlert message={formError} />}
               {editingUser && (
-                <form onSubmit={handleUpdate} className="space-y-4">
-                  <label className="form-control w-full">
-                    <div className="label"><span className="label-text">Nombre completo</span></div>
-                    <input name="name" type="text" className="input input-bordered w-full" defaultValue={editingUser.name} required />
-                  </label>
-                  <div className="form-control w-full">
-                    <div className="label"><span className="label-text">Email</span></div>
-                    <input type="email" className="input input-bordered w-full input-disabled" value={editingUser.email} disabled />
-                    <div className="label">
-                      <span className="label-text-alt text-base-content/50">El email no se puede modificar</span>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <label className="form-control w-full">
-                      <div className="label"><span className="label-text">Rol</span></div>
-                      <select name="role" className="select select-bordered w-full" defaultValue={editingUser.role} required>
-                        {Object.entries(ROLE_LABELS).map(([key, label]) => (
-                          <option key={key} value={key}>{label}</option>
+                <form onSubmit={handleUpdate} className="space-y-4 mt-3">
+                  <fieldset className="fieldset">
+                    <legend className="fieldset-legend text-xs">Nombre completo</legend>
+                    <input
+                      name="name"
+                      type="text"
+                      className="input input-bordered w-full"
+                      defaultValue={editingUser.name}
+                      required
+                    />
+                  </fieldset>
+
+                  <fieldset className="fieldset">
+                    <legend className="fieldset-legend text-xs flex items-center gap-1">
+                      <Mail className="w-3 h-3" /> Email
+                    </legend>
+                    <input
+                      type="email"
+                      className="input input-bordered w-full bg-base-200/50 cursor-not-allowed"
+                      value={editingUser.email}
+                      disabled
+                    />
+                    <p className="text-[10px] text-base-content/30 mt-1 ml-1">
+                      El email no se puede modificar
+                    </p>
+                  </fieldset>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <fieldset className="fieldset">
+                      <legend className="fieldset-legend text-xs flex items-center gap-1">
+                        <Shield className="w-3 h-3" /> Rol
+                      </legend>
+                      <select
+                        name="role"
+                        className="select select-bordered w-full"
+                        defaultValue={editingUser.role}
+                        required
+                      >
+                        {Object.entries(ROLE_CONFIG).map(([key, config]) => (
+                          <option key={key} value={key}>
+                            {config.label}
+                          </option>
                         ))}
                       </select>
-                    </label>
-                    <label className="form-control w-full">
-                      <div className="label"><span className="label-text">Sucursal</span></div>
-                      <select name="branchId" className="select select-bordered w-full" defaultValue={editingUser.branchId} required>
+                    </fieldset>
+
+                    <fieldset className="fieldset">
+                      <legend className="fieldset-legend text-xs flex items-center gap-1">
+                        <Building2 className="w-3 h-3" /> Sucursal
+                      </legend>
+                      <select
+                        name="branchId"
+                        className="select select-bordered w-full"
+                        defaultValue={editingUser.branchId}
+                        required
+                      >
                         {branches.map((b) => (
-                          <option key={b.id} value={b.id}>{b.name}</option>
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
                         ))}
                       </select>
-                    </label>
+                    </fieldset>
                   </div>
-                  <div className="modal-action">
-                    <button type="button" className="btn btn-ghost" onClick={() => { editModalRef.current?.close(); setEditingUser(null); setFormError(null); }} disabled={submitting}>Cancelar</button>
-                    <button type="submit" className="btn btn-warning" disabled={submitting}>
-                      {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      type="button"
+                      className="btn btn-ghost flex-1"
+                      onClick={() => {
+                        editModalRef.current?.close();
+                        setEditingUser(null);
+                        setFormError(null);
+                      }}
+                      disabled={submitting}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn btn-warning flex-1 gap-2"
+                      disabled={submitting}
+                    >
+                      {submitting ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="w-4 h-4" />
+                      )}
                       Guardar cambios
                     </button>
                   </div>
                 </form>
               )}
             </div>
-            <form method="dialog" className="modal-backdrop"><button>close</button></form>
-          </dialog>
+          </Modal>
 
-          <dialog ref={passwordModalRef} className="modal">
-            <div className="modal-box max-w-sm">
-              <form method="dialog">
-                <button className="btn btn-sm btn-circle btn-ghost absolute right-4 top-4">✕</button>
-              </form>
-              <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
-                <KeyRound className="w-5 h-5 text-info" />
-                Cambiar Contraseña
-              </h3>
+          <Modal dialogRef={passwordModalRef} maxWidth="max-w-sm">
+            <ModalHeader
+              icon={KeyRound}
+              iconColor="bg-info/10 text-info"
+              title="Cambiar Contraseña"
+              subtitle={passwordUser?.name}
+              onClose={() => {
+                passwordModalRef.current?.close();
+                setPasswordUser(null);
+                resetPasswordForm();
+              }}
+            />
+            <div className="p-6 pt-4">
+              {formError && <FormAlert message={formError} />}
+
               {passwordUser && (
-                <p className="text-sm text-base-content/60 mb-6">
-                  Usuario: <strong>{passwordUser.name}</strong>
-                </p>
-              )}
-              {formError && (
-                <div className="alert alert-error mb-4">
-                  <AlertCircle className="w-4 h-4" />
-                  <span>{formError}</span>
+                <div className="flex items-center gap-3 p-3 bg-base-200/50 rounded-xl mt-1 mb-4">
+                  <UserAvatar name={passwordUser.name} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold truncate">{passwordUser.name}</p>
+                    <p className="text-xs text-base-content/40 truncate">{passwordUser.email}</p>
+                  </div>
                 </div>
               )}
+
               <form onSubmit={handleChangePassword} className="space-y-4">
-                <div className="form-control w-full">
-                  <div className="label"><span className="label-text">Nueva contraseña</span></div>
-                  <PasswordInput name="newPassword" placeholder="Mínimo 6 caracteres" value={newPassword} onChange={setNewPassword} />
-                </div>
-                <div className="form-control w-full">
-                  <div className="label"><span className="label-text">Confirmar contraseña</span></div>
-                  <PasswordInput name="confirmNewPassword" placeholder="Repite la contraseña" value={confirmNewPassword} onChange={setConfirmNewPassword} />
-                </div>
-                <div className="modal-action">
-                  <button type="button" className="btn btn-ghost" onClick={() => { passwordModalRef.current?.close(); setPasswordUser(null); resetPasswordForm(); }} disabled={submitting}>Cancelar</button>
-                  <button type="submit" className="btn btn-info" disabled={submitting}>
-                    {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                    Cambiar contraseña
+                <fieldset className="fieldset">
+                  <legend className="fieldset-legend text-xs">Nueva contraseña</legend>
+                  <PasswordInput
+                    name="newPassword"
+                    placeholder="Mínimo 6 caracteres"
+                    value={newPassword}
+                    onChange={setNewPassword}
+                  />
+                </fieldset>
+
+                <fieldset className="fieldset">
+                  <legend className="fieldset-legend text-xs">Confirmar contraseña</legend>
+                  <PasswordInput
+                    name="confirmNewPassword"
+                    placeholder="Repite la contraseña"
+                    value={confirmNewPassword}
+                    onChange={setConfirmNewPassword}
+                  />
+                </fieldset>
+
+                {newPassword && confirmNewPassword && (
+                  <div
+                    className={`flex items-center gap-1.5 text-xs ${newPassword === confirmNewPassword ? "text-success" : "text-error"
+                      }`}
+                  >
+                    {newPassword === confirmNewPassword ? (
+                      <>
+                        <CheckCircle2 className="w-3 h-3" /> Las contraseñas coinciden
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="w-3 h-3" /> Las contraseñas no coinciden
+                      </>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    className="btn btn-ghost flex-1"
+                    onClick={() => {
+                      passwordModalRef.current?.close();
+                      setPasswordUser(null);
+                      resetPasswordForm();
+                    }}
+                    disabled={submitting}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-info flex-1 gap-2"
+                    disabled={submitting}
+                  >
+                    {submitting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <KeyRound className="w-4 h-4" />
+                    )}
+                    Cambiar
                   </button>
                 </div>
               </form>
             </div>
-            <form method="dialog" className="modal-backdrop"><button>close</button></form>
-          </dialog>
+          </Modal>
 
-          <dialog ref={confirmModalRef} className="modal">
-            <div className="modal-box max-w-sm">
-              <form method="dialog">
-                <button className="btn btn-sm btn-circle btn-ghost absolute right-4 top-4">✕</button>
-              </form>
-              {confirmAction && (
-                <>
-                  <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+          <Modal dialogRef={confirmModalRef} maxWidth="max-w-sm">
+            {confirmAction && (
+              <>
+                <div className="p-6 pb-0 flex justify-end">
+                  <button
+                    className="btn btn-ghost btn-sm btn-circle"
+                    onClick={() => {
+                      confirmModalRef.current?.close();
+                      setConfirmAction(null);
+                    }}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="px-6 pb-6 text-center space-y-4">
+                  <div
+                    className={`
+                      w-16 h-16 rounded-2xl mx-auto flex items-center justify-center
+                      ${confirmAction.action === "deactivate"
+                        ? "bg-error/10"
+                        : "bg-success/10"
+                      }
+                    `}
+                  >
                     {confirmAction.action === "deactivate" ? (
-                      <UserX className="w-5 h-5 text-error" />
+                      <UserX className="w-8 h-8 text-error" />
                     ) : (
-                      <UserCheck className="w-5 h-5 text-success" />
+                      <UserCheck className="w-8 h-8 text-success" />
                     )}
-                    {confirmAction.action === "deactivate" ? "Desactivar Usuario" : "Activar Usuario"}
-                  </h3>
-                  <p className="text-base-content/70">
-                    ¿Estás seguro de que deseas <strong>{confirmAction.action === "deactivate" ? "desactivar" : "activar"}</strong> al usuario <strong>{confirmAction.user.name}</strong>?
-                  </p>
+                  </div>
+
+                  <div>
+                    <h3 className="font-extrabold text-lg">
+                      {confirmAction.action === "deactivate"
+                        ? "Desactivar Usuario"
+                        : "Activar Usuario"}
+                    </h3>
+                    <p className="text-sm text-base-content/50 mt-2">
+                      ¿Estás seguro de{" "}
+                      <strong>
+                        {confirmAction.action === "deactivate" ? "desactivar" : "activar"}
+                      </strong>{" "}
+                      a <strong>{confirmAction.user.name}</strong>?
+                    </p>
+                  </div>
+
                   {confirmAction.action === "deactivate" && (
-                    <div className="alert alert-warning mt-4">
-                      <AlertCircle className="w-4 h-4" />
-                      <span className="text-sm">El usuario no podrá iniciar sesión mientras esté desactivado.</span>
+                    <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/20 rounded-xl text-warning text-xs text-left">
+                      <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                      <span>El usuario no podrá iniciar sesión mientras esté desactivado.</span>
                     </div>
                   )}
-                  <div className="modal-action">
-                    <button className="btn btn-ghost" onClick={() => { confirmModalRef.current?.close(); setConfirmAction(null); }} disabled={submitting}>Cancelar</button>
-                    <button className={`btn ${confirmAction.action === "deactivate" ? "btn-error" : "btn-success"}`} onClick={handleToggleStatus} disabled={submitting}>
-                      {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      className="btn btn-ghost flex-1"
+                      onClick={() => {
+                        confirmModalRef.current?.close();
+                        setConfirmAction(null);
+                      }}
+                      disabled={submitting}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      className={`btn flex-1 gap-2 ${confirmAction.action === "deactivate"
+                        ? "btn-error"
+                        : "btn-success"
+                        }`}
+                      onClick={handleToggleStatus}
+                      disabled={submitting}
+                    >
+                      {submitting ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : confirmAction.action === "deactivate" ? (
+                        <UserX className="w-4 h-4" />
+                      ) : (
+                        <UserCheck className="w-4 h-4" />
+                      )}
                       {confirmAction.action === "deactivate" ? "Desactivar" : "Activar"}
                     </button>
                   </div>
-                </>
-              )}
-            </div>
-            <form method="dialog" className="modal-backdrop"><button>close</button></form>
-          </dialog>
+                </div>
+              </>
+            )}
+          </Modal>
 
-          <dialog ref={deleteModalRef} className="modal">
-            <div className="modal-box max-w-sm">
-              <form method="dialog">
-                <button className="btn btn-sm btn-circle btn-ghost absolute right-4 top-4">✕</button>
-              </form>
-              {deletingUser && (
-                <>
-                  <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                    <Trash2 className="w-5 h-5 text-error" />
-                    Eliminar Usuario
-                  </h3>
-                  <p className="text-base-content/70">
-                    ¿Estás seguro de que deseas eliminar permanentemente al usuario <strong>{deletingUser.name}</strong>?
-                  </p>
-                  <div className="alert alert-error mt-4">
-                    <AlertCircle className="w-4 h-4" />
-                    <div>
-                      <p className="text-sm font-semibold">Esta acción no se puede deshacer</p>
-                      <p className="text-xs">Se eliminarán todos los datos asociados a este usuario.</p>
+          <Modal dialogRef={deleteModalRef} maxWidth="max-w-sm">
+            {deletingUser && (
+              <>
+                <div className="p-6 pb-0 flex justify-end">
+                  <button
+                    className="btn btn-ghost btn-sm btn-circle"
+                    onClick={() => {
+                      deleteModalRef.current?.close();
+                      setDeletingUser(null);
+                    }}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="px-6 pb-6 text-center space-y-4">
+                  <div className="w-16 h-16 rounded-2xl bg-error/10 mx-auto flex items-center justify-center">
+                    <Trash2 className="w-8 h-8 text-error" />
+                  </div>
+
+                  <div>
+                    <h3 className="font-extrabold text-lg">Eliminar Usuario</h3>
+                    <p className="text-sm text-base-content/50 mt-2">
+                      ¿Estás seguro de eliminar permanentemente a{" "}
+                      <strong>{deletingUser.name}</strong>?
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-3 bg-base-200/50 rounded-xl text-left">
+                    <UserAvatar name={deletingUser.name} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold truncate">{deletingUser.name}</p>
+                      <p className="text-xs text-base-content/40 truncate">{deletingUser.email}</p>
                     </div>
                   </div>
-                  <div className="modal-action">
-                    <button className="btn btn-ghost" onClick={() => { deleteModalRef.current?.close(); setDeletingUser(null); }} disabled={submitting}>Cancelar</button>
-                    <button className="btn btn-error" onClick={handleDelete} disabled={submitting}>
-                      {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+
+                  <div className="flex items-start gap-2 p-3 bg-error/10 border border-error/20 rounded-xl text-error text-xs text-left">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold">Esta acción no se puede deshacer</p>
+                      <p className="text-error/70 mt-0.5">
+                        Se eliminarán todos los datos asociados.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      className="btn btn-ghost flex-1"
+                      onClick={() => {
+                        deleteModalRef.current?.close();
+                        setDeletingUser(null);
+                      }}
+                      disabled={submitting}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      className="btn btn-error flex-1 gap-2"
+                      onClick={handleDelete}
+                      disabled={submitting}
+                    >
+                      {submitting ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
                       Eliminar
                     </button>
                   </div>
-                </>
-              )}
-            </div>
-            <form method="dialog" className="modal-backdrop"><button>close</button></form>
-          </dialog>
+                </div>
+              </>
+            )}
+          </Modal>
         </>
       )}
     </div>

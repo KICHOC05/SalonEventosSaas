@@ -1,12 +1,11 @@
 package com.example.demo.payment.dto;
 
-import lombok.Getter;
-import lombok.Setter;
-
+import lombok.Builder;
+import lombok.Data;
 import java.math.BigDecimal;
 
-@Getter
-@Setter
+@Data
+@Builder
 public class PaymentResponse {
 
     private BigDecimal orderTotal;
@@ -14,4 +13,7 @@ public class PaymentResponse {
     private BigDecimal remainingAmount;
     private BigDecimal change;
 
+    private BigDecimal amountReceived;
+    private BigDecimal amountApplied;
+    private String paymentMethod;
 }

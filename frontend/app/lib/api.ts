@@ -1,4 +1,3 @@
-
 const API_BASE = "http://localhost:8080/api";
 
 export interface LoginRequest {
@@ -87,6 +86,22 @@ export async function apiFetch<T>(
     });
 
     if (response.status === 401 || response.status === 403) {
+        if (endpoint === "/auth/login") {
+            let errorBody: any = {};
+            try {
+                const text = await response.text();
+                if (text && text.trim().length > 0) {
+                    errorBody = JSON.parse(text);
+                }
+            } catch {
+            }
+            throw new ApiError(
+                errorBody.message || errorBody.error || "Credenciales incorrectas",
+                response.status,
+                errorBody
+            );
+        }
+
         clearStoredAuth();
         if (
             typeof window !== "undefined" &&
@@ -107,7 +122,7 @@ export async function apiFetch<T>(
         } catch {
         }
         throw new ApiError(
-            errorBody.error || `Error ${response.status}`,
+            errorBody.message || errorBody.error || `Error ${response.status}`,
             response.status,
             errorBody
         );
@@ -230,26 +245,6 @@ export async function fetchBranches(): Promise<BranchResponse[]> {
     return apiFetch<BranchResponse[]>("/branches");
 }
 
-export interface ProductResponse {
-    publicId: string;
-    name: string;
-    description: string | null;
-    price: number;
-    stock: number | null;
-    type: "PRODUCT" | "SERVICE" | "PACKAGE";
-    active: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface ProductRequest {
-    name: string;
-    description?: string;
-    price: number;
-    stock?: number;
-    type: "PRODUCT" | "SERVICE" | "PACKAGE";
-}
-
 export type ProductType = "PRODUCT" | "SERVICE" | "PACKAGE";
 
 export interface ProductResponse {
@@ -260,6 +255,9 @@ export interface ProductResponse {
     stock: number | null;
     type: ProductType;
     active: boolean;
+    department: string;
+    durationMinutes: number | null;
+    requiresSchedule: boolean | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -270,6 +268,9 @@ export interface ProductRequest {
     price: number;
     stock?: number;
     type: ProductType;
+    department: string;
+    durationMinutes?: number;
+    requiresSchedule?: boolean;
 }
 
 export async function fetchProducts(): Promise<ProductResponse[]> {
@@ -312,7 +313,11 @@ export async function toggleProductStatus(publicId: string): Promise<ProductResp
 export interface CashRegisterResponse {
     publicId: string;
     openingAmount: number;
+    cashSales: number;
+    cardSales: number;
+    transferSales: number;
     salesTotal: number;
+    expectedCash: number;
     expectedAmount: number;
     countedAmount: number | null;
     difference: number | null;
@@ -372,7 +377,7 @@ export interface OrderResponse {
     items: OrderItemResponse[];
 }
 
-export type PaymentMethod = "CASH" | "CARD";
+export type PaymentMethod = "CASH" | "CARD" | "TRANSFER";
 
 export interface PaymentRequest {
     amount: number;
@@ -385,13 +390,15 @@ export interface PaymentResponse {
     totalPaid: number;
     remainingAmount: number;
     change: number;
+    amountReceived: number;
+    amountApplied: number;
+    paymentMethod: string;
 }
 
 export interface TaxSettingsResponse {
     taxEnabled: boolean;
     taxRate: number;
 }
-
 
 export async function openCashRegister(
     data: OpenCashRequest
@@ -414,7 +421,6 @@ export async function closeCashRegister(
         body: JSON.stringify(data),
     });
 }
-
 
 export async function createOrder(
     data: OrderCreateRequest
@@ -472,7 +478,6 @@ export async function cancelOrder(publicId: string): Promise<OrderResponse> {
     });
 }
 
-
 export async function registerPayment(
     orderPublicId: string,
     data: PaymentRequest
@@ -483,11 +488,9 @@ export async function registerPayment(
     });
 }
 
-
 export async function getTaxSettings(): Promise<TaxSettingsResponse> {
     return apiFetch<TaxSettingsResponse>("/settings/tax");
 }
-
 
 export async function getOrderTicket(orderPublicId: string): Promise<string> {
     const auth = getStoredAuth();
@@ -512,4 +515,174 @@ export async function getOrderTicket(orderPublicId: string): Promise<string> {
 
     if (!res.ok) throw new ApiError("Error al obtener ticket", res.status);
     return res.text();
+}
+
+export interface CompanySettingsResponse {
+    businessName: string;
+    phone: string | null;
+    website: string | null;
+    logoUrl: string | null;
+}
+
+export interface CompanySettingsRequest {
+    businessName?: string;
+    phone?: string;
+    website?: string;
+}
+
+export interface TenantSettingsResponse {
+    inventoryMode: "STRICT" | "WARNING" | "DISABLED";
+}
+
+export async function getCompanySettings(): Promise<CompanySettingsResponse> {
+    return apiFetch<CompanySettingsResponse>("/settings/company");
+}
+
+export async function updateCompanySettings(
+    data: CompanySettingsRequest
+): Promise<CompanySettingsResponse> {
+    return apiFetch<CompanySettingsResponse>("/settings/company", {
+        method: "PUT",
+        body: JSON.stringify(data),
+    });
+}
+
+export async function uploadLogo(file: File): Promise<{ logoUrl: string }> {
+    const auth = getStoredAuth();
+    const formData = new FormData();
+    formData.append("logo", file);
+
+    const headers: Record<string, string> = {};
+    if (auth?.token) {
+        headers["Authorization"] = `Bearer ${auth.token}`;
+    }
+
+    const res = await fetch(`${API_BASE}/settings/logo`, {
+        method: "POST",
+        headers,
+        body: formData,
+    });
+
+    if (res.status === 401 || res.status === 403) {
+        clearStoredAuth();
+        throw new ApiError("Sesión expirada", res.status);
+    }
+
+    if (!res.ok) {
+        let errorBody: any = {};
+        try { errorBody = await res.json(); } catch { }
+        throw new ApiError(
+            errorBody.error || `Error ${res.status}`,
+            res.status,
+            errorBody
+        );
+    }
+
+    return res.json();
+}
+
+
+export async function getTenantSettings(): Promise<TenantSettingsResponse> {
+    return apiFetch<TenantSettingsResponse>("/settings");
+}
+
+export async function updateInventoryMode(
+    mode: "STRICT" | "WARNING" | "DISABLED"
+): Promise<TenantSettingsResponse> {
+    return apiFetch<TenantSettingsResponse>("/settings/inventory-mode", {
+        method: "PUT",
+        body: JSON.stringify({ inventoryMode: mode }),
+    });
+}
+
+
+export interface TaxSettingsRequest {
+    taxEnabled: boolean;
+    taxRate: number;
+}
+
+export async function updateTaxSettings(
+    data: TaxSettingsRequest
+): Promise<TaxSettingsResponse> {
+    return apiFetch<TaxSettingsResponse>("/settings/tax", {
+        method: "PUT",
+        body: JSON.stringify(data),
+    });
+}
+
+
+export interface InventorySummary {
+    totalProducts: number;
+    totalStock: number;
+    lowStockCount: number;
+    lowStockProducts: {
+        publicId: string;
+        name: string;
+        stock: number;
+    }[];
+}
+
+export interface SalesChartData {
+    labels: string[];
+    data: number[];
+    fullDates: string[];
+}
+
+export interface TopItem {
+    publicId: string;
+    name: string;
+    quantitySold: number;
+    totalRevenue: number;
+}
+
+export interface UpcomingEvent {
+    date: string;
+    client: string;
+    packageName: string;
+    children: number;
+    status: string;
+}
+
+export interface DashboardData {
+    salesToday: number;
+    salesYesterday: number;
+    salesTodayGrowth: number;
+    monthlyRevenue: number;
+    previousMonthRevenue: number;
+    monthlyGrowth: number;
+    inventory: InventorySummary;
+    salesChart: SalesChartData;
+    topPackages: TopItem[];
+    upcomingEvents: UpcomingEvent[];
+    scheduledEventsCount: number;
+}
+
+export interface PaymentBreakdownData {
+    cashTotal: number;
+    cardTotal: number;
+    transferTotal: number;
+}
+
+export interface StatsData {
+    rangeDays: number;
+    dateFrom: string;
+    dateTo: string;
+    dailySales: SalesChartData;
+    salesByProduct: TopItem[];
+    salesByPackage: TopItem[];
+    topProducts: TopItem[];
+    totalSales: number;
+    averageTicket: number;
+    growthPercentage: number;
+    totalOrders: number;
+    scheduledEvents: number;
+    paymentBreakdown: PaymentBreakdownData;
+}
+
+export async function fetchDashboard(): Promise<DashboardData> {
+    return apiFetch<DashboardData>("/dashboard");
+}
+
+export async function fetchStats(range: number = 7): Promise<StatsData> {
+    return apiFetch<StatsData>(`/dashboard/stats?range=${range}`);
 }

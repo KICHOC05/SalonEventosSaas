@@ -22,7 +22,6 @@ public class Product {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // 🔐 UUID público
     @Column(name = "public_id", nullable = false, unique = true, updatable = false)
     private String publicId;
 
@@ -38,7 +37,7 @@ public class Product {
             this.publicId = UUID.randomUUID().toString();
         }
         this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now(); // 🔥 IMPORTANTE
+        this.updatedAt = LocalDateTime.now();
     }
 
     @PreUpdate
@@ -71,12 +70,13 @@ public class Product {
     @Column(nullable = false)
     private Boolean active = true;
 
+    @NotBlank
     @Column(nullable = false, length = 100)
     private String department;
 
-    // SOLO para HOURLY
+    @Column(name = "duration_minutes")
     private Integer durationMinutes;
 
-    // SOLO para EVENT
+    @Column(name = "requires_schedule")
     private Boolean requiresSchedule;
 }

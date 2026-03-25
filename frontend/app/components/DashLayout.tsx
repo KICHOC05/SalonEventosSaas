@@ -1,11 +1,10 @@
-// app/components/DashLayout.tsx
-import { useEffect } from "react";
-import { Outlet, Link, NavLink, useLocation, useNavigate } from "react-router";
+import { useEffect, useState } from "react";
+import { Outlet, NavLink, useLocation, useNavigate } from "react-router";
 import {
   Rocket,
   BarChart3,
   Calendar,
-  UtensilsCrossed,
+  PackageSearch,
   Receipt,
   PieChart,
   Users,
@@ -15,33 +14,35 @@ import {
   ChevronDown,
   Menu,
   Building2,
+  X,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { useAuth } from "~/lib/auth";
 
-/* ── Tipo para items de navegación ── */
 interface NavItem {
   to: string;
   icon: typeof BarChart3;
   label: string;
-  roles?: string[]; // Si no se define, todos pueden ver
+  description?: string;
+  roles?: string[];
 }
 
-/* ── Navegación del sidebar con roles ── */
 const NAV_ITEMS: NavItem[] = [
-  { to: "/dashboard", icon: BarChart3, label: "Dashboard" },
-  { to: "/dashboard/eventos", icon: Calendar, label: "Gestión de Eventos" },
-  { to: "/dashboard/inventario", icon: UtensilsCrossed, label: "Inventario de Menús" },
-  { to: "/dashboard/pos", icon: Receipt, label: "Punto de Venta" },
-  { to: "/dashboard/estadisticas", icon: PieChart, label: "Estadísticas" },
+  { to: "/dashboard", icon: BarChart3, label: "Dashboard", description: "Vista general" },
+  { to: "/dashboard/eventos", icon: Calendar, label: "Eventos", description: "Gestión de eventos" },
+  { to: "/dashboard/inventario", icon: PackageSearch, label: "Inventario", description: "Productos y stock" },
+  { to: "/dashboard/pos", icon: Receipt, label: "Punto de Venta", description: "Ventas rápidas" },
+  { to: "/dashboard/estadisticas", icon: PieChart, label: "Estadísticas", description: "Métricas y análisis" },
   {
     to: "/dashboard/usuarios",
     icon: Users,
     label: "Usuarios",
-    roles: ["ADMIN", "MANAGER"], // ← Solo ADMIN y MANAGER
+    description: "Gestión de accesos",
+    roles: ["ADMIN", "MANAGER"],
   },
 ];
 
-/* ── Títulos por ruta ── */
 const PAGE_TITLES: Record<string, string> = {
   "/dashboard": "Dashboard General",
   "/dashboard/eventos": "Gestión de Eventos",
@@ -52,256 +53,331 @@ const PAGE_TITLES: Record<string, string> = {
   "/dashboard/configuracion": "Configuración",
 };
 
-/* ── Etiquetas de rol ── */
-const ROLE_LABELS: Record<string, string> = {
-  ADMIN: "Administrador",
-  MANAGER: "Gerente",
-  CASHIER: "Cajero",
-  EMPLOYEE: "Empleado",
+const ROLE_LABELS: Record<string, { label: string; color: string }> = {
+  ADMIN: { label: "Administrador", color: "badge-error" },
+  MANAGER: { label: "Gerente", color: "badge-warning" },
+  CASHIER: { label: "Cajero", color: "badge-info" },
+  EMPLOYEE: { label: "Empleado", color: "badge-success" },
 };
+
+function UserAvatar({ name, size = "sm" }: { name: string; size?: "sm" | "md" }) {
+  const initials = name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .substring(0, 2)
+    .toUpperCase();
+
+  const sizeClasses = size === "sm" ? "w-9 h-9 text-xs" : "w-11 h-11 text-sm";
+
+  return (
+    <div className="avatar placeholder">
+      <div
+        className={`bg-gradient-to-br from-primary via-secondary to-accent ${sizeClasses} rounded-xl flex items-center justify-center shadow-md`}
+      >
+        <span className="text-white font-bold tracking-wide">{initials}</span>
+      </div>
+    </div>
+  );
+}
+
+function NotificationDropdown() {
+  const notifications = [
+    { id: 1, icon: "📅", text: "Evento mañana a las 14:00", time: "Hace 5 min", unread: true },
+    { id: 2, icon: "⚠️", text: "Stock bajo de cupcakes", time: "Hace 1 hora", unread: true },
+    { id: 3, icon: "💬", text: "Nuevo mensaje de cliente", time: "Hace 3 horas", unread: true },
+  ];
+
+  return (
+    <div className="dropdown dropdown-end">
+      <div tabIndex={0} role="button" className="btn btn-ghost btn-circle relative group">
+        <Bell className="w-5 h-5 group-hover:animate-swing" />
+        <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75" />
+          <span className="relative inline-flex rounded-full h-4 w-4 bg-error text-[10px] text-white items-center justify-center font-bold">
+            {notifications.length}
+          </span>
+        </span>
+      </div>
+      <div
+        tabIndex={0}
+        className="dropdown-content bg-base-100 rounded-2xl w-80 shadow-2xl border border-base-300/50 mt-3 z-50 overflow-hidden"
+      >
+        <div className="px-4 py-3 border-b border-base-300/50 flex items-center justify-between">
+          <h3 className="font-semibold text-sm">Notificaciones</h3>
+          <button className="btn btn-ghost btn-xs text-primary">Marcar todas</button>
+        </div>
+        <ul className="divide-y divide-base-300/30">
+          {notifications.map((n) => (
+            <li key={n.id}>
+              <button className="w-full text-left px-4 py-3 hover:bg-base-200/50 transition-colors flex items-start gap-3">
+                <span className="text-xl mt-0.5">{n.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{n.text}</p>
+                  <p className="text-xs text-base-content/40 mt-0.5">{n.time}</p>
+                </div>
+                {n.unread && <span className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />}
+              </button>
+            </li>
+          ))}
+        </ul>
+        <div className="px-4 py-2.5 border-t border-base-300/50">
+          <button className="btn btn-ghost btn-sm btn-block text-primary">Ver todas</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, role, isAuthenticated, isLoading, logout } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const pageTitle = PAGE_TITLES[location.pathname] ?? "Space Kids";
 
-  // ── Protección de ruta ──
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       navigate("/dashboard/login", { replace: true });
     }
   }, [isLoading, isAuthenticated, navigate]);
 
-  // Mostrar loading mientras se verifica la sesión
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-base-200 flex items-center justify-center">
-        <div className="text-center">
-          <span className="loading loading-spinner loading-lg text-primary" />
-          <p className="mt-4 text-base-content/50">Verificando sesión...</p>
+        <div className="text-center space-y-4">
+          <div className="relative">
+            <span className="loading loading-spinner loading-lg text-primary" />
+            <div className="absolute inset-0 animate-ping">
+              <span className="loading loading-spinner loading-lg text-primary/20" />
+            </div>
+          </div>
+          <p className="text-base-content/50 animate-pulse">Verificando sesión...</p>
         </div>
       </div>
     );
   }
 
-  // Si no está autenticado, no renderizar nada
-  if (!isAuthenticated || !user) {
-    return null;
-  }
+  if (!isAuthenticated || !user) return null;
 
   const handleLogout = () => {
     logout();
     navigate("/dashboard/login", { replace: true });
   };
 
-  // ═══════════════════════════════════════════════════
-  // FILTRAR ITEMS DE NAVEGACIÓN SEGÚN EL ROL
-  // ═══════════════════════════════════════════════════
   const visibleNavItems = NAV_ITEMS.filter((item) => {
-    // Si no tiene restricción de roles, todos pueden ver
     if (!item.roles) return true;
-    // Si tiene roles definidos, verificar que el usuario tenga uno de ellos
     return item.roles.includes(role);
   });
 
+  const roleInfo = ROLE_LABELS[user.role] || { label: user.role, color: "badge-ghost" };
+
   return (
-    <div className="drawer lg:drawer-open">
-      <input id="sidebar" type="checkbox" className="drawer-toggle" />
-
-      {/* ═══ CONTENIDO PRINCIPAL ═══ */}
-      <div className="drawer-content flex flex-col bg-base-200">
-        {/* Topbar */}
-        <div className="navbar bg-base-100 border-b border-base-300 sticky top-0 z-40">
-          <div className="navbar-start">
-            <label
-              htmlFor="sidebar"
-              className="btn btn-ghost btn-square lg:hidden"
-            >
-              <Menu className="w-5 h-5" />
-            </label>
-            <div className="ml-2">
-              <h2 className="text-lg font-semibold">{pageTitle}</h2>
-              <p className="text-xs text-base-content/50 hidden sm:block">
-                {user.businessName} — {user.branchName}
-              </p>
-            </div>
-          </div>
-
-          <div className="navbar-end gap-2">
-            {/* Sucursal actual */}
-            <div className="hidden md:flex items-center gap-1 text-sm text-base-content/60 mr-2">
-              <Building2 className="w-4 h-4" />
-              <span>{user.branchName}</span>
-            </div>
-
-            {/* Notificaciones */}
-            <div className="dropdown dropdown-end">
-              <div
-                tabIndex={0}
-                role="button"
-                className="btn btn-ghost btn-circle indicator"
-              >
-                <Bell className="w-5 h-5" />
-                <span className="indicator-item badge badge-error badge-xs">
-                  3
-                </span>
-              </div>
-              <ul
-                tabIndex={0}
-                className="dropdown-content menu bg-base-100 rounded-box w-72 p-2 shadow-lg border border-base-300 mt-2 z-50"
-              >
-                <li className="menu-title">Notificaciones</li>
-                <li>
-                  <a>📅 Evento mañana a las 14:00</a>
-                </li>
-                <li>
-                  <a>⚠️ Stock bajo de cupcakes</a>
-                </li>
-                <li>
-                  <a>💬 Nuevo mensaje de cliente</a>
-                </li>
-              </ul>
-            </div>
-
-            {/* Perfil */}
-            <div className="dropdown dropdown-end">
-              <div
-                tabIndex={0}
-                role="button"
-                className="btn btn-ghost gap-2"
-              >
-                <div className="avatar placeholder">
-                  <div className="bg-gradient-to-r from-primary to-secondary w-8 rounded-full flex items-center justify-center">
-                    <span className="text-xs text-white font-bold">
-                      {user.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                        .substring(0, 2)
-                        .toUpperCase()}
-                    </span>
-                  </div>
-                </div>
-                <span className="hidden sm:inline text-sm">{user.name}</span>
-                <ChevronDown className="w-4 h-4" />
-              </div>
-              <ul
-                tabIndex={0}
-                className="dropdown-content menu bg-base-100 rounded-box w-56 p-2 shadow-lg border border-base-300 mt-2 z-50"
-              >
-                <li className="menu-title">
-                  <div className="flex flex-col">
-                    <span className="font-semibold">{user.name}</span>
-                    <span className="text-xs font-normal opacity-60">
-                      {user.email}
-                    </span>
-                    <span className="badge badge-primary badge-xs mt-1">
-                      {ROLE_LABELS[user.role] || user.role}
-                    </span>
-                  </div>
-                </li>
-                <div className="divider my-0" />
-                <li>
-                  <NavLink to="/dashboard/configuracion">
-                    <Settings className="w-4 h-4" /> Configuración
-                  </NavLink>
-                </li>
-                <li>
-                  <button onClick={handleLogout} className="text-error">
-                    <LogOut className="w-4 h-4" /> Cerrar sesión
-                  </button>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        {/* Contenido de la ruta */}
-        <main className="flex-1 p-6">
-          <Outlet />
-        </main>
-      </div>
-
-      {/* ═══ SIDEBAR ═══ */}
-      <div className="drawer-side z-50">
-        <label
-          htmlFor="sidebar"
-          aria-label="cerrar sidebar"
-          className="drawer-overlay"
+    <div className="flex h-screen bg-base-200 overflow-hidden">
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm transition-opacity"
+          onClick={() => setSidebarOpen(false)}
         />
-        <aside className="bg-base-100 border-r border-base-300 w-64 min-h-full flex flex-col">
-          {/* Logo */}
-          <div className="p-5 border-b border-base-300 flex items-center gap-3">
-            <div className="bg-primary rounded-full w-10 h-10 flex items-center justify-center">
-              <Rocket className="w-5 h-5 text-primary-content" />
-            </div>
-            <div>
-              <span className="text-xl font-bold text-primary">Space Kids</span>
-              <p className="text-[10px] text-base-content/40 -mt-1">
-                {user.businessName}
-              </p>
-            </div>
-          </div>
+      )}
 
-          {/* ═══ MENÚ FILTRADO POR ROL ═══ */}
-          <ul className="menu menu-lg flex-1 p-4 gap-1">
-            {visibleNavItems.map(({ to, icon: Icon, label }) => (
-              <li key={to}>
-                <NavLink
-                  to={to}
-                  end={to === "/dashboard"}
-                  className={({ isActive }) =>
-                    isActive ? "active font-semibold" : ""
-                  }
-                >
-                  <Icon className="w-5 h-5" />
-                  {label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-
-          {/* Footer del sidebar */}
-          <div className="p-4 border-t border-base-300">
-            <div className="flex items-center gap-3 mb-3 px-2">
-              <div className="avatar placeholder">
-                <div className="bg-gradient-to-r from-primary to-secondary w-8 rounded-full flex items-center justify-center">
-                  <span className="text-xs text-white font-bold">
-                    {user.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")
-                      .substring(0, 2)
-                      .toUpperCase()}
-                  </span>
+      <aside
+        className={`
+          fixed lg:static inset-y-0 left-0 z-50
+          w-72 bg-base-100 border-r border-base-300/50
+          flex flex-col transition-transform duration-300 ease-out
+          ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+        `}
+      >
+        <div className="p-5 border-b border-base-300/50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="bg-gradient-to-br from-primary to-secondary rounded-xl w-10 h-10 flex items-center justify-center shadow-lg shadow-primary/20">
+                  <Rocket className="w-5 h-5 text-primary-content" />
                 </div>
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-success rounded-full border-2 border-base-100" />
               </div>
               <div>
-                <p className="text-sm font-medium">{user.name}</p>
-                <p className="text-xs text-base-content/50">
-                  {ROLE_LABELS[user.role] || user.role}
+                <span className="text-lg font-extrabold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                  Space Kids
+                </span>
+                <p className="text-[10px] text-base-content/40 font-medium tracking-wide uppercase">
+                  {user.businessName}
                 </p>
               </div>
             </div>
-            <ul className="menu menu-sm p-0 gap-1">
-              <li>
-                <NavLink
-                  to="/dashboard/configuracion"
-                  className={({ isActive }) => (isActive ? "active" : "")}
-                >
-                  <Settings className="w-4 h-4" /> Configuración
-                </NavLink>
-              </li>
-              <li>
-                <button onClick={handleLogout} className="text-error">
-                  <LogOut className="w-4 h-4" /> Cerrar Sesión
-                </button>
-              </li>
-            </ul>
+            <button
+              className="btn btn-ghost btn-sm btn-square lg:hidden"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
-        </aside>
+        </div>
+
+        <nav className="flex-1 overflow-y-auto py-4 px-3">
+          <div className="space-y-1">
+            {visibleNavItems.map(({ to, icon: Icon, label, description }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === "/dashboard"}
+                className={({ isActive }) => `
+                  group flex items-center gap-3 px-3 py-2.5 rounded-xl
+                  transition-all duration-200 relative
+                  ${isActive
+                    ? "bg-primary/10 text-primary font-semibold shadow-sm"
+                    : "text-base-content/60 hover:text-base-content hover:bg-base-200/80"
+                  }
+                `}
+              >
+                {({ isActive }) => (
+                  <>
+                    {isActive && (
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full" />
+                    )}
+                    <div
+                      className={`
+                        w-9 h-9 rounded-lg flex items-center justify-center transition-colors flex-shrink-0
+                        ${isActive ? "bg-primary/15" : "bg-base-200/60 group-hover:bg-base-300/60"}
+                      `}
+                    >
+                      <Icon className="w-[18px] h-[18px]" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm leading-tight">{label}</p>
+                      {description && (
+                        <p className="text-[10px] text-base-content/40 leading-tight mt-0.5 truncate">
+                          {description}
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </div>
+        </nav>
+
+        <div className="p-3 border-t border-base-300/50">
+          <div className="bg-base-200/50 rounded-xl p-3 space-y-3">
+            <div className="flex items-center gap-3">
+              <UserAvatar name={user.name} size="md" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold truncate">{user.name}</p>
+                <span className={`badge ${roleInfo.color} badge-xs mt-0.5`}>
+                  {roleInfo.label}
+                </span>
+              </div>
+            </div>
+            <div className="flex gap-1">
+              <NavLink
+                to="/dashboard/configuracion"
+                className={({ isActive }) =>
+                  `btn btn-sm flex-1 gap-1.5 ${isActive ? "btn-primary" : "btn-ghost"}`
+                }
+              >
+                <Settings className="w-3.5 h-3.5" />
+                <span className="text-xs">Ajustes</span>
+              </NavLink>
+              <button
+                onClick={handleLogout}
+                className="btn btn-sm btn-ghost text-error hover:bg-error/10 gap-1.5 flex-1"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="text-xs">Salir</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <header className="bg-base-100/80 backdrop-blur-xl border-b border-base-300/50 sticky top-0 z-30">
+          <div className="flex items-center justify-between px-4 lg:px-6 h-16">
+            <div className="flex items-center gap-3">
+              <button
+                className="btn btn-ghost btn-sm btn-square lg:hidden"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className="text-lg font-bold leading-tight">{pageTitle}</h1>
+                <div className="flex items-center gap-1.5 text-xs text-base-content/40">
+                  <Building2 className="w-3 h-3" />
+                  <span>{user.businessName}</span>
+                  <span>•</span>
+                  <span>{user.branchName}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <NotificationDropdown />
+
+              <div className="dropdown dropdown-end">
+                <div
+                  tabIndex={0}
+                  role="button"
+                  className="btn btn-ghost gap-2 pl-2 pr-3 rounded-xl hover:bg-base-200/80"
+                >
+                  <UserAvatar name={user.name} />
+                  <div className="hidden sm:block text-left">
+                    <p className="text-sm font-medium leading-tight">{user.name}</p>
+                    <p className="text-[10px] text-base-content/40">{roleInfo.label}</p>
+                  </div>
+                  <ChevronDown className="w-3.5 h-3.5 text-base-content/40" />
+                </div>
+                <div
+                  tabIndex={0}
+                  className="dropdown-content bg-base-100 rounded-2xl w-64 shadow-2xl border border-base-300/50 mt-2 z-50 overflow-hidden"
+                >
+                  <div className="p-4 bg-gradient-to-br from-primary/5 to-secondary/5">
+                    <div className="flex items-center gap-3">
+                      <UserAvatar name={user.name} size="md" />
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm truncate">{user.name}</p>
+                        <p className="text-xs text-base-content/50 truncate">{user.email}</p>
+                        <span className={`badge ${roleInfo.color} badge-xs mt-1`}>
+                          {roleInfo.label}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-2">
+                    <NavLink
+                      to="/dashboard/configuracion"
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-base-200/80 transition-colors text-sm"
+                    >
+                      <Settings className="w-4 h-4 text-base-content/50" />
+                      Configuración
+                    </NavLink>
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-error/10 transition-colors text-sm text-error w-full"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Cerrar sesión
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto">
+          <div className="p-4 lg:p-6 max-w-[1600px] mx-auto">
+            <Outlet />
+          </div>
+        </main>
       </div>
     </div>
   );

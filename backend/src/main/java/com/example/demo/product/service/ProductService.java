@@ -22,13 +22,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final TenantRepository tenantRepository;
 
-    // =========================
-    // 🔹 CREATE
-    // =========================
     public ProductResponse create(ProductRequest request) {
-
-        validateRequest(request);
-
         Long tenantId = TenantContext.getTenantId();
 
         Tenant tenant = tenantRepository.findById(tenantId)
@@ -42,51 +36,34 @@ public class ProductService {
         product.setPrice(request.getPrice());
         product.setType(request.getType());
         product.setDepartment(request.getDepartment());
+        product.setDurationMinutes(request.getDurationMinutes());
+        product.setRequiresSchedule(request.getRequiresSchedule());
         product.setActive(true);
 
         applyBusinessRules(product, request);
 
         productRepository.save(product);
-
         return mapToResponse(product);
     }
 
-    // =========================
-    // 🔹 FIND ALL
-    // =========================
     public List<ProductResponse> findAll() {
-
         Long tenantId = TenantContext.getTenantId();
-
         return productRepository.findAllByTenant_Id(tenantId)
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
     }
 
-    // =========================
-    // 🔹 FIND BY PUBLIC ID
-    // =========================
     public ProductResponse findByPublicId(String publicId) {
-
         Long tenantId = TenantContext.getTenantId();
-
         Product product = productRepository
                 .findByPublicIdAndTenant_IdAndActiveTrue(publicId, tenantId)
                 .orElseThrow(() -> new EntityNotFoundException("Product not found"));
-
         return mapToResponse(product);
     }
 
-    // =========================
-    // 🔹 UPDATE
-    // =========================
     public ProductResponse update(String publicId, ProductRequest request) {
-
-        validateRequest(request);
-
         Long tenantId = TenantContext.getTenantId();
-
         Product product = productRepository
                 .findByPublicIdAndTenant_IdAndActiveTrue(publicId, tenantId)
                 .orElseThrow(() -> new EntityNotFoundException("Product not found"));
@@ -96,28 +73,30 @@ public class ProductService {
         product.setPrice(request.getPrice());
         product.setType(request.getType());
         product.setDepartment(request.getDepartment());
-
-        applyBusinessRules(product, request);
+        product.setDurationMinutes(request.getDurationMinutes());
+        product.setRequiresSchedule(request.getRequiresSchedule());
 
         productRepository.save(product);
-
         return mapToResponse(product);
     }
 
-    // =========================
-    // 🔹 DELETE (SOFT)
-    // =========================
     public void delete(String publicId) {
-
         Long tenantId = TenantContext.getTenantId();
-
         Product product = productRepository
                 .findByPublicIdAndTenant_IdAndActiveTrue(publicId, tenantId)
                 .orElseThrow(() -> new EntityNotFoundException("Product not found"));
-
         product.setActive(false);
-
         productRepository.save(product);
+    }
+
+    public ProductResponse toggleStatus(String publicId) {
+        Long tenantId = TenantContext.getTenantId();
+        Product product = productRepository
+                .findByPublicIdAndTenant_Id(publicId, tenantId)
+                .orElseThrow(() -> new EntityNotFoundException("Product not found"));
+        product.setActive(!product.getActive());
+        productRepository.save(product);
+        return mapToResponse(product);
     }
 
     // =========================
@@ -213,7 +192,6 @@ public class ProductService {
     // 🔹 MAPPER
     // =========================
     private ProductResponse mapToResponse(Product product) {
-
         ProductResponse response = new ProductResponse();
 
         response.setPublicId(product.getPublicId());
@@ -223,12 +201,11 @@ public class ProductService {
         response.setStock(product.getStock());
         response.setType(product.getType());
         response.setActive(product.getActive());
+        response.setDepartment(product.getDepartment());
+        response.setDurationMinutes(product.getDurationMinutes());
+        response.setRequiresSchedule(product.getRequiresSchedule());
         response.setCreatedAt(product.getCreatedAt());
         response.setUpdatedAt(product.getUpdatedAt());
-        response.setDurationMinutes(product.getDurationMinutes());
-        response.setDepartment(product.getDepartment());
-        response.setRequiresSchedule(product.getRequiresSchedule());
-
         return response;
     }
 }

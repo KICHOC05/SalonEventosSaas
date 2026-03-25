@@ -57,12 +57,10 @@ public class Order {
     @Column(nullable = false)
     private BigDecimal tax = BigDecimal.ZERO;
 
-
     private String customerName;
     private String childName;
 
     private LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime closedAt;
 
-    
 }

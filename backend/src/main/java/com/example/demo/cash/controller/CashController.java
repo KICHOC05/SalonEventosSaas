@@ -18,9 +18,6 @@ public class CashController {
 
     private final CashService cashService;
 
-    // =========================
-    // OPEN CASH
-    // =========================
 
     @PostMapping("/open")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','EMPLOYEE')")
@@ -30,9 +27,6 @@ public class CashController {
         return cashService.openCash(request);
     }
 
-    // =========================
-    // CURRENT CASH STATUS
-    // =========================
 
     @GetMapping("/current")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','EMPLOYEE')")
@@ -41,9 +35,6 @@ public class CashController {
         return cashService.currentCash();
     }
 
-    // =========================
-    // CLOSE CASH
-    // =========================
 
     @PostMapping("/close")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")

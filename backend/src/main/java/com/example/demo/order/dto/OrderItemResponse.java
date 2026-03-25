@@ -10,21 +10,21 @@ import java.time.LocalDateTime;
 @Setter
 public class OrderItemResponse {
 
-    private String productPublicId;
+  private String productPublicId;
 
-      private String publicId;
+  private String publicId;
 
-    private String productName;
+  private String productName;
 
-    private Integer quantity;
+  private Integer quantity;
 
-    private BigDecimal unitPrice;
+  private BigDecimal unitPrice;
 
-    private BigDecimal subtotal;
+  private BigDecimal subtotal;
 
-    private String warning;
+  private String warning;
 
-    private String status;
+  private String status;
 
     private LocalDateTime sessionStart;
 

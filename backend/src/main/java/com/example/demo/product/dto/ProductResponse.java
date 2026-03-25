@@ -1,7 +1,6 @@
 package com.example.demo.product.dto;
 
 import com.example.demo.common.enums.ProductType;
-
 import lombok.Getter;
 import lombok.Setter;
 
@@ -19,10 +18,9 @@ public class ProductResponse {
     private Integer stock;
     private ProductType type;
     private Boolean active;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
     private String department;
     private Integer durationMinutes;
     private Boolean requiresSchedule;
-
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

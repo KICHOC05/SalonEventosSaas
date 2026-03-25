@@ -48,10 +48,6 @@ public class OrderService {
     private final TaxSettingsRepository taxSettingsRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
 
-    // =========================
-    // CREATE ORDER
-    // =========================
-
     public OrderResponse createOrder(OrderCreateRequest request) {
 
         Long tenantId = TenantContext.getTenantId();
@@ -85,10 +81,6 @@ public class OrderService {
 
         return mapToResponse(order);
     }
-
-    // =========================
-    // ADD ITEM
-    // =========================
 
     public OrderResponse addItem(String orderPublicId, OrderItemRequest request) {
 
@@ -170,10 +162,6 @@ public class OrderService {
         return getOrder(orderPublicId);
     }
 
-    // =========================
-    // VOID ITEM
-    // =========================
-
     public OrderResponse voidItem(String orderPublicId, String itemPublicId) {
 
         Long tenantId = TenantContext.getTenantId();
@@ -213,10 +201,6 @@ public class OrderService {
 
         return getOrder(orderPublicId);
     }
-
-    // =========================
-    // UPDATE ITEM QUANTITY
-    // =========================
 
     public OrderResponse updateItemQuantity(
             String orderPublicId,
@@ -258,37 +242,35 @@ public class OrderService {
         return getOrder(orderPublicId);
     }
 
-    // =========================
-    // CLOSE ORDER
-    // =========================
-
     public OrderResponse closeOrder(String publicId) {
 
-        Long tenantId = TenantContext.getTenantId();
+    Long tenantId = TenantContext.getTenantId();
 
-        Order order = getOrderEntity(publicId, tenantId);
+    Order order = getOrderEntity(publicId, tenantId);
 
-        BigDecimal paid = paymentRepository.sumPaymentsByOrderId(order.getId());
-
-        if (paid == null) paid = BigDecimal.ZERO;
-
-        if (paid.compareTo(order.getTotalAmount()) < 0) {
-
-            throw new IllegalStateException("Pago incompleto");
-
-        }
-
-        order.setStatus(OrderStatus.CLOSED);
-        order.setClosedAt(LocalDateTime.now());
-
-        orderRepository.save(order);
-
+    if (order.getStatus() == OrderStatus.CLOSED) {
         return mapToResponse(order);
     }
 
-    // =========================
-    // CANCEL ORDER
-    // =========================
+    if (order.getStatus() == OrderStatus.CANCELLED) {
+        throw new IllegalStateException("No se puede cerrar una orden cancelada");
+    }
+
+    BigDecimal paid = paymentRepository.sumPaymentsByOrderId(order.getId());
+    if (paid == null)
+        paid = BigDecimal.ZERO;
+
+    if (paid.compareTo(order.getTotalAmount()) < 0) {
+        throw new IllegalStateException("Pago incompleto");
+    }
+
+    order.setStatus(OrderStatus.CLOSED);
+    order.setClosedAt(LocalDateTime.now());
+
+    orderRepository.save(order);
+
+    return mapToResponse(order);
+}
 
     public OrderResponse cancelOrder(String publicId) {
 
@@ -320,10 +302,6 @@ public class OrderService {
         return mapToResponse(order);
     }
 
-    // =========================
-    // GET ORDER
-    // =========================
-
     public OrderResponse getOrder(String publicId) {
 
         Long tenantId = TenantContext.getTenantId();
@@ -332,10 +310,6 @@ public class OrderService {
 
         return mapToResponse(order);
     }
-
-    // =========================
-    // PRIVATE METHODS
-    // =========================
 
     private Order getOrderEntity(String publicId, Long tenantId) {
 
