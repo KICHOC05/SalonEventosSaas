@@ -3,9 +3,14 @@ package com.example.demo.product.dto;
 import com.example.demo.common.enums.ProductType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.math.BigDecimal;
 
+
+@Getter
+@Setter
 public class ProductRequest {
 
 	@NotBlank
@@ -60,14 +65,13 @@ public class ProductRequest {
 	public void setStock(Integer stock) {
 		this.stock = stock;
 	}
+    @NotNull
+    private ProductType type;
 
-	public ProductType getType() {
-		return type;
-	}
+	@NotNull
+	private String department;
 
-	public void setType(ProductType type) {
-		this.type = type;
-	}
+    private Integer durationMinutes;
 
 	public String getDepartment() {
 		return department;

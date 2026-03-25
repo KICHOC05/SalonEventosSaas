@@ -70,3 +70,9 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end);
 }
+       List<OrderItem> findByActiveTrueAndSessionEndBeforeAndOrder_Tenant_Id(
+            LocalDateTime now,
+            Long tenantId
+       );
+
+}

@@ -8,6 +8,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.UUID;
 
@@ -51,4 +52,20 @@ public class OrderItem {
     private LocalDate eventDate;
     private LocalTime startTime;
     private LocalTime endTime;
+
+    // =========================
+    // HOURLY (TIMERS)
+    // =========================
+
+   @Column(name = "session_start")
+    private LocalDateTime sessionStart;
+
+    @Column(name = "session_end")
+    private LocalDateTime sessionEnd;
+
+    @Column(name = "duration_minutes")
+    private Integer durationMinutes;
+
+    @Column(name = "active")
+    private Boolean active;
 }
