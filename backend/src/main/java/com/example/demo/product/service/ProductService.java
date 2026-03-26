@@ -6,7 +6,7 @@ import com.example.demo.product.dto.ProductRequest;
 import com.example.demo.product.dto.ProductResponse;
 import com.example.demo.product.model.Product;
 import com.example.demo.product.repository.ProductRepository;
-import com.example.demo.tenant.model.Tenant;
+import com  .example.demo.tenant.model.Tenant;
 import com.example.demo.tenant.repository.TenantRepository;
 
 import jakarta.persistence.EntityNotFoundException;
@@ -88,17 +88,7 @@ public class ProductService {
         product.setActive(false);
         productRepository.save(product);
     }
-
-    public ProductResponse toggleStatus(String publicId) {
-        Long tenantId = TenantContext.getTenantId();
-        Product product = productRepository
-                .findByPublicIdAndTenant_Id(publicId, tenantId)
-                .orElseThrow(() -> new EntityNotFoundException("Product not found"));
-        product.setActive(!product.getActive());
-        productRepository.save(product);
-        return mapToResponse(product);
-    }
-
+    
     // =========================
     // 🔹 TOGGLE STATUS
     // =========================

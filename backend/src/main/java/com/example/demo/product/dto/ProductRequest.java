@@ -65,13 +65,6 @@ public class ProductRequest {
 	public void setStock(Integer stock) {
 		this.stock = stock;
 	}
-    @NotNull
-    private ProductType type;
-
-	@NotNull
-	private String department;
-
-    private Integer durationMinutes;
 
 	public String getDepartment() {
 		return department;
