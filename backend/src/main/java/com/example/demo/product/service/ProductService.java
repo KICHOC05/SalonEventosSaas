@@ -6,7 +6,7 @@ import com.example.demo.product.dto.ProductRequest;
 import com.example.demo.product.dto.ProductResponse;
 import com.example.demo.product.model.Product;
 import com.example.demo.product.repository.ProductRepository;
-import com  .example.demo.tenant.model.Tenant;
+import com.example.demo.tenant.model.Tenant;
 import com.example.demo.tenant.repository.TenantRepository;
 
 import jakarta.persistence.EntityNotFoundException;
@@ -88,7 +88,7 @@ public class ProductService {
         product.setActive(false);
         productRepository.save(product);
     }
-    
+
     // =========================
     // 🔹 TOGGLE STATUS
     // =========================
