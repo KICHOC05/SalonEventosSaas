@@ -68,4 +68,7 @@ public class OrderItem {
 
     @Column(name = "active")
     private Boolean active;
+
+    @Column(nullable = false)
+    private Boolean isEvent = false;
 }
