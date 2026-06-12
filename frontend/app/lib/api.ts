@@ -342,6 +342,9 @@ export interface OrderCreateRequest {
 export interface OrderItemRequest {
     productPublicId: string;
     quantity: number;
+
+    childName?: string;
+
     eventDate?: string;
     startTime?: string;
     endTime?: string;
@@ -352,14 +355,16 @@ export interface UpdateOrderItemRequest {
 }
 
 export interface OrderItemResponse {
-    publicId: string;
-    productPublicId: string;
-    productName: string;
-    quantity: number;
-    unitPrice: number;
-    subtotal: number;
-    warning: string | null;
-    status: string;
+  publicId: string;
+  productPublicId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  status: string;
+  warning?: string;
+
+  childName?: string;
 }
 
 export type OrderStatus = "OPEN" | "CLOSED" | "CANCELLED" | "PARTIALLY_PAID";
@@ -375,6 +380,44 @@ export interface OrderResponse {
     createdAt: string;
     closedAt: string | null;
     items: OrderItemResponse[];
+}
+
+export interface ActiveSessionResponse {
+    itemPublicId: string;
+
+    childName: string;
+    productName: string;
+
+    sessionStart: string;
+    sessionEnd: string;
+
+    remainingSeconds: number;
+    remainingMinutes: number;
+
+    durationMinutes: number;
+
+    expiringSoon: boolean;
+
+    expired: boolean;
+
+    progressPercent: number;
+
+    status: string;
+
+    customerName: string;
+    orderPublicId: string;
+}
+
+export interface TimerDashboardResponse {
+    activeSessions: number;
+
+    expiringSoon: number;
+
+    finishedToday: number;
+
+    expired: number;
+
+    totalTodayMinutes: number;
 }
 
 export type PaymentMethod = "CASH" | "CARD" | "TRANSFER";
@@ -399,6 +442,27 @@ export interface TaxSettingsResponse {
     taxEnabled: boolean;
     taxRate: number;
 }
+
+export interface TimerHistoryResponse {
+    itemPublicId: string;
+    orderPublicId: string;
+    customerName: string;
+    childName: string;
+    productName: string;
+    sessionStart: string;
+    sessionEnd: string;
+    durationMinutes: number;
+    status: string;
+}
+
+export interface PageResponse<T> {
+    content: T[];
+    totalElements: number;
+    totalPages: number;
+    size: number;
+    number: number;
+}
+
 
 export async function openCashRegister(
     data: OpenCashRequest
@@ -685,4 +749,46 @@ export async function fetchDashboard(): Promise<DashboardData> {
 
 export async function fetchStats(range: number = 7): Promise<StatsData> {
     return apiFetch<StatsData>(`/dashboard/stats?range=${range}`);
+}
+
+// =========================
+// TIMERS
+// =========================
+
+export async function fetchActiveSessions(): Promise<ActiveSessionResponse[]> {
+    return apiFetch<ActiveSessionResponse[]>("/timers/active");
+}
+
+export async function fetchTimerHistory(
+    page = 0,
+    size = 10,
+    search?: string,
+    status?: string,
+    date?: string
+): Promise<PageResponse<TimerHistoryResponse>> {
+
+    const params = new URLSearchParams();
+
+    params.set("page", String(page));
+    params.set("size", String(size));
+
+    if (search?.trim()) {
+        params.set("search", search);
+    }
+
+    if (status?.trim()) {
+        params.set("status", status);
+    }
+
+    if (date?.trim()) {
+        params.set("date", date);
+    }
+
+    return apiFetch<PageResponse<TimerHistoryResponse>>(
+        `/timers/history?${params.toString()}`
+    );
+}
+
+export async function fetchTimerDashboard(): Promise<TimerDashboardResponse> {
+    return apiFetch<TimerDashboardResponse>("/timers/dashboard");
 }

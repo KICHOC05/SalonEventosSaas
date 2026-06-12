@@ -58,7 +58,7 @@ public class Order {
     private BigDecimal tax = BigDecimal.ZERO;
 
     private String customerName;
-    private String childName;
+   
 
     private LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime closedAt;

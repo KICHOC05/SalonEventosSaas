@@ -16,6 +16,8 @@ public class OrderItemResponse {
 
   private String productName;
 
+  private String childName;
+
   private Integer quantity;
 
   private BigDecimal unitPrice;

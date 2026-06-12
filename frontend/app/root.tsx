@@ -1,7 +1,9 @@
 // app/root.tsx
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 import { AuthProvider } from "~/lib/auth";
+import { NotificationProvider } from "~/context/NotificationContext";
 import "./app.css";
+import { Toaster } from "react-hot-toast";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -14,6 +16,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
+        <Toaster
+          position="top-right"
+          reverseOrder={false}
+        />
         <ScrollRestoration />
         <Scripts />
       </body>
@@ -24,7 +30,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <AuthProvider>
-      <Outlet />
+      <NotificationProvider>
+        <Outlet />
+      </NotificationProvider>
     </AuthProvider>
   );
 }

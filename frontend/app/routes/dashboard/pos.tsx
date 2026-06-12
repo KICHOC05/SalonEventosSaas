@@ -124,7 +124,6 @@ interface OrderTab {
     label: string;
     order: OrderResponse | null;
     customerName: string;
-    childName: string;
 }
 
 let tabCounter = 1;
@@ -330,7 +329,7 @@ export default function POS() {
 
     const initialTabId = generateTabId();
     const [orderTabs, setOrderTabs] = useState<OrderTab[]>([
-        { id: initialTabId, label: "Orden 1", order: null, customerName: "", childName: "" },
+        { id: initialTabId, label: "Orden 1", order: null, customerName: "" },
     ]);
     const [activeOrderTabId, setActiveOrderTabId] = useState<string>(initialTabId);
 
@@ -356,10 +355,26 @@ export default function POS() {
     const [paying, setPaying] = useState(false);
     const [orderCompleted, setOrderCompleted] = useState(false);
 
+    // Nuevos estados para el modal de servicio
+    const [showServiceModal, setShowServiceModal] = useState(false);
+    const [pendingProduct, setPendingProduct] = useState<ProductResponse | null>(null);
+    const [serviceChildName, setServiceChildName] = useState("");
+
     const currentTab = orderTabs.find((t) => t.id === activeOrderTabId);
     const order = currentTab?.order ?? null;
     const customerName = currentTab?.customerName ?? "";
-    const childName = currentTab?.childName ?? "";
+
+    // Obtener lista única de niños de los items activos
+    const getUniqueChildrenFromItems = useCallback((): string[] => {
+        if (!order?.items) return [];
+        const children = order.items
+            .filter(item => item.status === "ACTIVE" && item.childName && item.childName.trim())
+            .map(item => item.childName!)
+            .filter((value, index, self) => self.indexOf(value) === index);
+        return children;
+    }, [order?.items]);
+
+    const uniqueChildren = getUniqueChildrenFromItems();
 
     const showToast = (type: Toast["type"], message: string) => {
         const id = Date.now();
@@ -383,11 +398,6 @@ export default function POS() {
 
     const setCustomerName = useCallback(
         (name: string) => updateCurrentTab({ customerName: name }),
-        [updateCurrentTab]
-    );
-
-    const setChildName = useCallback(
-        (name: string) => updateCurrentTab({ childName: name }),
         [updateCurrentTab]
     );
 
@@ -437,7 +447,6 @@ export default function POS() {
             label: `Orden ${orderTabs.length + 1}`,
             order: null,
             customerName: "",
-            childName: "",
         };
         setOrderTabs((prev) => [...prev, newTab]);
         setActiveOrderTabId(newTab.id);
@@ -456,7 +465,6 @@ export default function POS() {
                 label: "Orden 1",
                 order: null,
                 customerName: "",
-                childName: "",
             };
             setOrderTabs([newTab]);
             setActiveOrderTabId(newTab.id);
@@ -522,12 +530,89 @@ export default function POS() {
         }
     }
 
+    // Nueva función para agregar servicio con nombre de niño
+    async function handleAddServiceProduct() {
+        if (!pendingProduct) return;
+
+        if (!serviceChildName.trim()) {
+            showToast("warning", "Ingresa el nombre del niño");
+            return;
+        }
+
+        if (addingProductId) return;
+        setAddingProductId(pendingProduct.publicId);
+
+        try {
+            let currentOrder = order;
+            if (!currentOrder) {
+                if (!customerName.trim()) {
+                    showToast("warning", "Debes capturar el nombre del padre antes de agregar una hora de juego");
+                    setAddingProductId(null);
+                    return;
+                }
+                setOrderLoading(true);
+                currentOrder = await createOrder({
+                    customerName: customerName || undefined,
+                });
+                setOrder(currentOrder);
+                updateCurrentTab({ order: currentOrder, label: customerName || "Orden" });
+            }
+
+            const updatedOrder = await addOrderItem(currentOrder.publicId, {
+                productPublicId: pendingProduct.publicId,
+                quantity: 1,
+                childName: serviceChildName.trim(),
+            });
+
+            setOrder(updatedOrder);
+            setProducts((prev) =>
+                prev.map((p) =>
+                    p.publicId === pendingProduct.publicId && p.stock !== null
+                        ? { ...p, stock: p.stock - 1 }
+                        : p
+                )
+            );
+
+            const warnings = updatedOrder.items?.filter(
+                (i) => i.productPublicId === pendingProduct.publicId && i.status === "ACTIVE" && i.warning
+            );
+            if (warnings && warnings.length > 0) {
+                showToast("warning", warnings[0].warning!);
+            } else {
+                showToast("success", `Hora agregada para ${serviceChildName.trim()}`);
+            }
+
+            setShowServiceModal(false);
+            setPendingProduct(null);
+            setServiceChildName("");
+        } catch (e: any) {
+            showToast("error", e.message || "Error al agregar servicio");
+        } finally {
+            setOrderLoading(false);
+            setTimeout(() => setAddingProductId(null), 600);
+        }
+    }
 
     async function handleAddProduct(product: ProductResponse) {
         if (!cashOpen) {
             setShowOpenCash(true);
             return;
         }
+
+        // REGLA: Para servicios, abrir modal
+        if (product.type === "SERVICE") {
+            // Regla 1: Validar nombre del padre si no hay orden
+            if (!order && !customerName.trim()) {
+                showToast("warning", "Debes capturar el nombre del padre antes de agregar una hora de juego");
+                return;
+            }
+            setPendingProduct(product);
+            setServiceChildName("");
+            setShowServiceModal(true);
+            return;
+        }
+
+        // PRODUCT y PACKAGE siguen flujo normal
         if (addingProductId) return;
         setAddingProductId(product.publicId);
 
@@ -537,7 +622,6 @@ export default function POS() {
                 setOrderLoading(true);
                 currentOrder = await createOrder({
                     customerName: customerName || undefined,
-                    childName: childName || undefined,
                 });
                 setOrder(currentOrder);
                 updateCurrentTab({ order: currentOrder, label: customerName || "Orden" });
@@ -648,7 +732,7 @@ export default function POS() {
     }
 
     function resetCurrentTab() {
-        updateCurrentTab({ order: null, customerName: "", childName: "", label: "Orden" });
+        updateCurrentTab({ order: null, customerName: "", label: "Orden" });
         setPayResult(null);
         setOrderCompleted(false);
         setShowPayment(false);
@@ -999,39 +1083,33 @@ export default function POS() {
                                         <User className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/30" />
                                         <input
                                             type="text"
-                                            placeholder="Nombre del cliente (opcional)"
+                                            placeholder="Nombre del padre / cliente"
                                             className="input input-bordered input-sm w-full pl-9 rounded-lg"
                                             value={customerName}
                                             onChange={(e) => setCustomerName(e.target.value)}
                                         />
                                     </div>
-                                    <div className="relative">
-                                        <Baby className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/30" />
-                                        <input
-                                            type="text"
-                                            placeholder="Nombre del niño(a) (opcional)"
-                                            className="input input-bordered input-sm w-full pl-9 rounded-lg"
-                                            value={childName}
-                                            onChange={(e) => setChildName(e.target.value)}
-                                        />
-                                    </div>
                                 </div>
                             )}
 
-                            {order && (order.customerName || order.childName) && (
+                            {order && order.customerName && (
                                 <div className="flex items-center gap-3 p-2.5 bg-base-200/50 rounded-xl mt-1 mb-2">
-                                    {order.customerName && (
-                                        <span className="text-xs flex items-center gap-1 text-base-content/60">
-                                            <User className="w-3 h-3" />
-                                            {order.customerName}
-                                        </span>
-                                    )}
-                                    {order.childName && (
-                                        <span className="text-xs flex items-center gap-1 text-base-content/60">
+                                    <span className="text-xs flex items-center gap-1 text-base-content/60">
+                                        <User className="w-3 h-3" />
+                                        {order.customerName}
+                                    </span>
+                                </div>
+                            )}
+
+                            {/* Lista de niños registrados en la orden actual */}
+                            {order && uniqueChildren.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-2 p-2.5 bg-base-200/50 rounded-xl mt-1 mb-2">
+                                    {uniqueChildren.map((child, idx) => (
+                                        <span key={idx} className="text-xs flex items-center gap-1 text-base-content/60 bg-base-100 px-2 py-1 rounded-lg">
                                             <Baby className="w-3 h-3" />
-                                            {order.childName}
+                                            {child}
                                         </span>
-                                    )}
+                                    ))}
                                 </div>
                             )}
 
@@ -1062,6 +1140,13 @@ export default function POS() {
                                             >
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-sm font-semibold truncate">{item.productName}</p>
+                                                    {/* Mostrar nombre del niño si existe */}
+                                                    {item.childName && (
+                                                        <p className="text-[11px] text-primary flex items-center gap-1 mt-0.5">
+                                                            <Baby className="w-2.5 h-2.5" />
+                                                            {item.childName}
+                                                        </p>
+                                                    )}
                                                     <div className="flex items-center gap-2 mt-0.5">
                                                         <span className="text-[11px] text-base-content/40">
                                                             {formatMoney(item.unitPrice)} × {item.quantity}
@@ -1216,6 +1301,69 @@ export default function POS() {
                 </div>
             </div>
 
+            {/* Modal para capturar nombre del niño en servicios */}
+            <Modal
+                open={showServiceModal}
+                onClose={() => {
+                    setShowServiceModal(false);
+                    setPendingProduct(null);
+                    setServiceChildName("");
+                }}
+                maxWidth="max-w-sm"
+            >
+                <ModalHeader
+                    icon={Baby}
+                    iconColor="bg-primary/10 text-primary"
+                    title="Hora de Juego"
+                    subtitle="Captura el nombre del niño"
+                    onClose={() => {
+                        setShowServiceModal(false);
+                        setPendingProduct(null);
+                        setServiceChildName("");
+                    }}
+                />
+                <div className="p-5 pt-4 space-y-4">
+                    <fieldset className="fieldset">
+                        <legend className="fieldset-legend text-xs flex items-center gap-1">
+                            <Baby className="w-3 h-3" /> Nombre del niño
+                        </legend>
+                        <input
+                            type="text"
+                            placeholder="Ej: Luis, Sofía, Mateo..."
+                            className="input input-bordered w-full"
+                            value={serviceChildName}
+                            onChange={(e) => setServiceChildName(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleAddServiceProduct()}
+                            autoFocus
+                        />
+                    </fieldset>
+
+                    <div className="flex gap-2">
+                        <button
+                            className="btn btn-ghost flex-1"
+                            onClick={() => {
+                                setShowServiceModal(false);
+                                setPendingProduct(null);
+                                setServiceChildName("");
+                            }}
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            className="btn btn-primary flex-1 gap-2 shadow-md shadow-primary/20"
+                            onClick={handleAddServiceProduct}
+                            disabled={addingProductId === pendingProduct?.publicId}
+                        >
+                            {addingProductId === pendingProduct?.publicId ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Plus className="w-4 h-4" />
+                            )}
+                            Agregar Servicio
+                        </button>
+                    </div>
+                </div>
+            </Modal>
 
             <Modal
                 open={showOpenCash}
@@ -1684,7 +1832,7 @@ export default function POS() {
                                     setCountedCash("");
                                     const newTabId = generateTabId();
                                     setOrderTabs([
-                                        { id: newTabId, label: "Orden 1", order: null, customerName: "", childName: "" },
+                                        { id: newTabId, label: "Orden 1", order: null, customerName: "" },
                                     ]);
                                     setActiveOrderTabId(newTabId);
                                     refreshProducts();

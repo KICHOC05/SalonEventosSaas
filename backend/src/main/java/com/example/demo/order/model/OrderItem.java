@@ -45,6 +45,9 @@ public class OrderItem {
     @Column(length = 255)
     private String warning;
 
+    @Column(name = "child_name", length = 150)
+private String childName;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private OrderItemStatus status = OrderItemStatus.ACTIVE;

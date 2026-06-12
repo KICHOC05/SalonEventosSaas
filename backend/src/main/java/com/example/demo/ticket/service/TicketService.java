@@ -2,6 +2,7 @@ package com.example.demo.ticket.service;
 
 import com.example.demo.branch.model.Branch;
 import com.example.demo.common.enums.OrderItemStatus;
+import com.example.demo.common.enums.ProductType;
 import com.example.demo.order.model.Order;
 import com.example.demo.order.model.OrderItem;
 import com.example.demo.order.repository.OrderItemRepository;
@@ -22,7 +23,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -165,15 +168,23 @@ public class TicketService {
                 ticket.append("<div class='item'><span>Cajero:</span><span>")
                                 .append(escapeHtml(cashier.getName())).append("</span></div>");
 
-                if (order.getCustomerName() != null && !order.getCustomerName().isEmpty()) {
+                if (hasText(order.getCustomerName())) {
                         ticket.append("<div class='item'><span>Cliente:</span><span>")
                                         .append(escapeHtml(order.getCustomerName()))
                                         .append("</span></div>");
                 }
-                if (order.getChildName() != null && !order.getChildName().isEmpty()) {
-                        ticket.append("<div class='item'><span>Niño(a):</span><span>")
-                                        .append(escapeHtml(order.getChildName()))
-                                        .append("</span></div>");
+
+                // CHILDREN SECTION - Before products
+                List<String> uniqueChildren = getUniqueChildren(activeItems);
+                if (!uniqueChildren.isEmpty()) {
+                        ticket.append("<div class='line'></div>");
+                        ticket.append("<div class='center bold'>NIÑOS REGISTRADOS</div>");
+                        ticket.append("<div class='line'></div>");
+                        for (String childName : uniqueChildren) {
+                                ticket.append("<div class='item'>");
+                                ticket.append("<span>• ").append(escapeHtml(childName)).append("</span>");
+                                ticket.append("</div>");
+                        }
                 }
 
                 ticket.append("<div class='line'></div>");
@@ -191,11 +202,35 @@ public class TicketService {
                                         .append("</span>");
                         ticket.append("</div>");
 
+                        // Show child name for SERVICE type
+                        if (item.getProduct().getType() == ProductType.SERVICE && hasText(item.getChildName())) {
+                                ticket.append("<div class='item-detail'>")
+                                                .append("Niño: ").append(escapeHtml(item.getChildName()))
+                                                .append("</div>");
+                        }
+
                         if (item.getQuantity() > 1) {
                                 ticket.append("<div class='item-detail'>")
                                                 .append(item.getQuantity()).append(" x $")
                                                 .append(formatDecimal(item.getUnitPrice()))
                                                 .append("</div>");
+                        }
+
+                        // Show session info for timers
+                        if (item.getSessionStart() != null && item.getSessionEnd() != null) {
+                                ticket.append("<div class='item-detail'>")
+                                                .append("Inicio: ").append(item.getSessionStart()
+                                                                .format(DateTimeFormatter.ofPattern("HH:mm")))
+                                                .append("</div>");
+                                ticket.append("<div class='item-detail'>")
+                                                .append("Fin: ").append(item.getSessionEnd()
+                                                                .format(DateTimeFormatter.ofPattern("HH:mm")))
+                                                .append("</div>");
+                                if (item.getDurationMinutes() != null) {
+                                        ticket.append("<div class='item-detail'>")
+                                                        .append("Duración: ").append(item.getDurationMinutes())
+                                                        .append(" min</div>");
+                                }
                         }
                 }
 
@@ -247,7 +282,7 @@ public class TicketService {
                                                 .append("</div>");
                         }
 
-                        if (p.getReference() != null && !p.getReference().isEmpty()) {
+                        if (hasText(p.getReference())) {
                                 ticket.append("<div class='item-detail'>Ref: ")
                                                 .append(escapeHtml(p.getReference()))
                                                 .append("</div>");
@@ -292,6 +327,23 @@ public class TicketService {
                 ticket.append("</body></html>");
 
                 return ticket.toString();
+        }
+
+        private List<String> getUniqueChildren(List<OrderItem> items) {
+                Set<String> uniqueChildren = new LinkedHashSet<>();
+
+                for (OrderItem item : items) {
+                        String childName = item.getChildName();
+                        if (hasText(childName)) {
+                                uniqueChildren.add(childName);
+                        }
+                }
+
+                return List.copyOf(uniqueChildren);
+        }
+
+        private boolean hasText(String value) {
+                return value != null && !value.trim().isEmpty();
         }
 
         private String formatDecimal(BigDecimal value) {

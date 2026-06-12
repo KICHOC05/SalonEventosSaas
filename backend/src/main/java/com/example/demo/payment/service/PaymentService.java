@@ -92,9 +92,17 @@ public class PaymentService {
         payment.setTenant(tenant);
         payment.setBranch(branch);
         payment.setUser(user);
+
         payment.setAmount(amountToApply);
+
+        // NUEVO
+        payment.setAmountReceived(amountReceived);
+        payment.setChangeAmount(change);
+
         payment.setPaymentMethod(request.getPaymentMethod());
         payment.setReference(request.getReference());
+
+paymentRepository.save(payment);
 
         paymentRepository.save(payment);
 

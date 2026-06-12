@@ -27,8 +27,11 @@ import com.example.demo.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -70,7 +73,6 @@ public class OrderService {
         order.setUser(user);
 
         order.setCustomerName(request.getCustomerName());
-        order.setChildName(request.getChildName());
 
         order.setStatus(OrderStatus.OPEN);
         order.setSubtotal(BigDecimal.ZERO);
@@ -82,6 +84,7 @@ public class OrderService {
         return mapToResponse(order);
     }
 
+    @Transactional
     public OrderResponse addItem(String orderPublicId, OrderItemRequest request) {
 
         Long tenantId = TenantContext.getTenantId();
@@ -94,6 +97,22 @@ public class OrderService {
                         tenantId)
                 .orElseThrow(() -> new EntityNotFoundException("Product not found"));
 
+        // REGLA DE NEGOCIO #3: Validar childName para servicios
+        if (product.getType() == ProductType.SERVICE) {
+            if (!StringUtils.hasText(request.getChildName())) {
+                throw new IllegalStateException("Debe capturar el nombre del niño");
+            }
+        }
+
+        // REGLA DE NEGOCIO #4: Servicios siempre tienen cantidad = 1
+        int finalQuantity = request.getQuantity();
+        if (product.getType() == ProductType.SERVICE) {
+            if (request.getQuantity() != 1) {
+                throw new IllegalStateException("Los servicios solo pueden tener cantidad 1");
+            }
+            finalQuantity = 1;
+        }
+
         TenantSettings settings = tenantSettingsRepository
                 .findByTenant_Id(tenantId)
                 .orElse(null);
@@ -105,7 +124,7 @@ public class OrderService {
         Integer stock = product.getStock();
         String warning = null;
 
-        if (stock != null && stock < request.getQuantity()) {
+        if (stock != null && stock < finalQuantity) {
 
             switch (mode) {
 
@@ -123,27 +142,29 @@ public class OrderService {
 
         item.setOrder(order);
         item.setProduct(product);
-        item.setQuantity(request.getQuantity());
+        item.setQuantity(finalQuantity);
         item.setUnitPrice(product.getPrice());
         item.setStatus(OrderItemStatus.ACTIVE);
 
-        // =========================
-        // HOURLY TIMER
-        // =========================
+        // REGLA DE NEGOCIO #3: Guardar childName en el OrderItem
+        if (product.getType() == ProductType.SERVICE) {
+            item.setChildName(request.getChildName());
+        }
 
-    if (product.getType() == ProductType.SERVICE) {
+        // REGLA DE NEGOCIO #6: Timers para servicios
+        if (product.getType() == ProductType.SERVICE) {
 
-        LocalDateTime now = LocalDateTime.now();
+            LocalDateTime now = LocalDateTime.now();
 
-        item.setSessionStart(now);
-        item.setDurationMinutes(product.getDurationMinutes());
+            item.setSessionStart(now);
+            item.setDurationMinutes(product.getDurationMinutes());
 
-        item.setSessionEnd(now.plusMinutes(product.getDurationMinutes()));
-        item.setActive(true);
-    }
+            item.setSessionEnd(now.plusMinutes(product.getDurationMinutes()));
+            item.setActive(true);
+        }
 
         BigDecimal subtotal = product.getPrice()
-                .multiply(BigDecimal.valueOf(request.getQuantity()));
+                .multiply(BigDecimal.valueOf(finalQuantity));
 
         item.setSubtotal(subtotal);
         item.setWarning(warning);
@@ -152,7 +173,7 @@ public class OrderService {
 
         if (mode != InventoryMode.DISABLED && product.getStock() != null) {
 
-            product.setStock(product.getStock() - request.getQuantity());
+            product.setStock(product.getStock() - finalQuantity);
             productRepository.save(product);
 
         }
@@ -162,6 +183,7 @@ public class OrderService {
         return getOrder(orderPublicId);
     }
 
+    @Transactional
     public OrderResponse voidItem(String orderPublicId, String itemPublicId) {
 
         Long tenantId = TenantContext.getTenantId();
@@ -202,6 +224,7 @@ public class OrderService {
         return getOrder(orderPublicId);
     }
 
+    @Transactional
     public OrderResponse updateItemQuantity(
             String orderPublicId,
             String itemPublicId,
@@ -216,6 +239,11 @@ public class OrderService {
                 .orElseThrow(() -> new EntityNotFoundException("Item not found"));
 
         Product product = item.getProduct();
+
+        // REGLA DE NEGOCIO #5: No permitir modificar cantidad de servicios
+        if (product.getType() == ProductType.SERVICE) {
+            throw new IllegalStateException("Los servicios no permiten modificar cantidad");
+        }
 
         int oldQty = item.getQuantity();
         int newQty = request.getQuantity();
@@ -244,34 +272,35 @@ public class OrderService {
 
     public OrderResponse closeOrder(String publicId) {
 
-    Long tenantId = TenantContext.getTenantId();
+        Long tenantId = TenantContext.getTenantId();
 
-    Order order = getOrderEntity(publicId, tenantId);
+        Order order = getOrderEntity(publicId, tenantId);
 
-    if (order.getStatus() == OrderStatus.CLOSED) {
+        if (order.getStatus() == OrderStatus.CLOSED) {
+            return mapToResponse(order);
+        }
+
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            throw new IllegalStateException("No se puede cerrar una orden cancelada");
+        }
+
+        BigDecimal paid = paymentRepository.sumPaymentsByOrderId(order.getId());
+        if (paid == null)
+            paid = BigDecimal.ZERO;
+
+        if (paid.compareTo(order.getTotalAmount()) < 0) {
+            throw new IllegalStateException("Pago incompleto");
+        }
+
+        order.setStatus(OrderStatus.CLOSED);
+        order.setClosedAt(LocalDateTime.now());
+
+        orderRepository.save(order);
+
         return mapToResponse(order);
     }
 
-    if (order.getStatus() == OrderStatus.CANCELLED) {
-        throw new IllegalStateException("No se puede cerrar una orden cancelada");
-    }
-
-    BigDecimal paid = paymentRepository.sumPaymentsByOrderId(order.getId());
-    if (paid == null)
-        paid = BigDecimal.ZERO;
-
-    if (paid.compareTo(order.getTotalAmount()) < 0) {
-        throw new IllegalStateException("Pago incompleto");
-    }
-
-    order.setStatus(OrderStatus.CLOSED);
-    order.setClosedAt(LocalDateTime.now());
-
-    orderRepository.save(order);
-
-    return mapToResponse(order);
-}
-
+    @Transactional
     public OrderResponse cancelOrder(String publicId) {
 
         Long tenantId = TenantContext.getTenantId();
@@ -371,7 +400,9 @@ public class OrderService {
                     response.setActive(item.getActive());
                     response.setSessionStart(item.getSessionStart());
                     response.setSessionEnd(item.getSessionEnd());
-    
+                    // REGLA DE NEGOCIO #2: Mapear childName desde OrderItem
+                    response.setChildName(item.getChildName());
+
                     return response;
 
                 }).toList();
@@ -381,13 +412,169 @@ public class OrderService {
         response.setPublicId(order.getPublicId());
         response.setStatus(order.getStatus());
         response.setCustomerName(order.getCustomerName());
-        response.setChildName(order.getChildName());
+        // REMOVED: order.getChildName() ya no existe en Order
         response.setSubtotal(order.getSubtotal());
         response.setTax(order.getTax());
         response.setTotalAmount(order.getTotalAmount());
         response.setCreatedAt(order.getCreatedAt());
         response.setClosedAt(order.getClosedAt());
         response.setItems(items);
+
+        return response;
+    }
+
+    public List<ActiveSessionResponse> getActiveSessions() {
+
+        Long tenantId = TenantContext.getTenantId();
+
+        LocalDateTime now = LocalDateTime.now();
+
+        List<OrderItem> items =
+                orderItemRepository
+                        .findByActiveTrueAndOrder_Tenant_Id(tenantId);
+
+        return items.stream()
+                .map(item -> {
+
+                    ActiveSessionResponse response =
+                            new ActiveSessionResponse();
+
+                    long seconds = 0;
+
+                    if (item.getSessionEnd() != null) {
+
+                        Duration remaining =
+                                Duration.between(
+                                        now,
+                                        item.getSessionEnd());
+
+                        seconds =
+                                Math.max(
+                                        remaining.getSeconds(),
+                                        0);
+                    }
+
+                    response.setItemPublicId(item.getPublicId());
+
+                    // REGLA DE NEGOCIO #2: Obtener childName de OrderItem
+                    response.setChildName(item.getChildName());
+
+                    response.setProductName(
+                            item.getProduct().getName());
+
+                    response.setSessionStart(
+                            item.getSessionStart());
+
+                    response.setSessionEnd(
+                            item.getSessionEnd());
+
+                    response.setRemainingSeconds(seconds);
+
+                    response.setRemainingMinutes(
+                            seconds / 60);
+
+                    response.setExpiringSoon(
+                            seconds <= 300);
+                            response.setExpired(seconds <= 0);
+
+                    response.setStatus(
+                            item.getStatus().name());
+
+                    return response;
+
+                })
+                .toList();
+    }
+
+    public List<ActiveSessionResponse> getSessionHistory() {
+
+        Long tenantId = TenantContext.getTenantId();
+
+        List<OrderItem> items =
+                orderItemRepository
+                        .findByStatusAndOrder_Tenant_Id(
+                                OrderItemStatus.FINISHED,
+                                tenantId);
+
+        return items.stream()
+                .map(item -> {
+
+                    ActiveSessionResponse response =
+                            new ActiveSessionResponse();
+
+                    response.setItemPublicId(
+                            item.getPublicId());
+
+                    // REGLA DE NEGOCIO #2: Obtener childName de OrderItem
+                    response.setChildName(item.getChildName());
+
+                    response.setProductName(
+                            item.getProduct().getName());
+
+                    response.setSessionStart(
+                            item.getSessionStart());
+
+                    response.setSessionEnd(
+                            item.getSessionEnd());
+
+                    response.setStatus(
+                            item.getStatus().name());
+
+                    return response;
+
+                })
+                .toList();
+    }
+
+    public TimerDashboardResponse getTimersDashboard() {
+
+        Long tenantId = TenantContext.getTenantId();
+
+        LocalDateTime now = LocalDateTime.now();
+
+        List<OrderItem> activeItems =
+                orderItemRepository
+                        .findByActiveTrueAndOrder_Tenant_Id(
+                                tenantId);
+
+        long expiringSoon =
+                activeItems.stream()
+                        .filter(item ->
+                                item.getSessionEnd() != null
+                                        && Duration.between(
+                                                now,
+                                                item.getSessionEnd())
+                                                .getSeconds() <= 300)
+                        .count();
+
+        LocalDateTime startOfDay =
+                LocalDateTime.now()
+                        .toLocalDate()
+                        .atStartOfDay();
+
+        LocalDateTime endOfDay =
+                startOfDay.plusDays(1);
+
+        long finishedToday =
+                orderItemRepository
+                        .findByStatusAndOrder_Tenant_IdAndSessionStartBetween(
+                                OrderItemStatus.FINISHED,
+                                tenantId,
+                                startOfDay,
+                                endOfDay)
+                        .size();
+
+        TimerDashboardResponse response =
+                new TimerDashboardResponse();
+
+        response.setActiveSessions(
+                (long) activeItems.size());
+
+        response.setExpiringSoon(
+                expiringSoon);
+
+        response.setFinishedToday(
+                finishedToday);
 
         return response;
     }

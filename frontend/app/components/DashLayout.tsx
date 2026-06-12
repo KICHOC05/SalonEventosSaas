@@ -17,8 +17,12 @@ import {
   X,
   Moon,
   Sun,
+  Clock,
 } from "lucide-react";
 import { useAuth } from "~/lib/auth";
+import { useNotifications } from "~/context/NotificationContext";
+
+import TimerNotificationWatcher from "~/components/TimerNotificationWatcher";
 
 interface NavItem {
   to: string;
@@ -30,6 +34,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { to: "/dashboard", icon: BarChart3, label: "Dashboard", description: "Vista general" },
+  { to: "/dashboard/timers", icon: Clock, label: "Timers", description: "Sesiones activas" },
   { to: "/dashboard/eventos", icon: Calendar, label: "Eventos", description: "Gestión de eventos" },
   { to: "/dashboard/inventario", icon: PackageSearch, label: "Inventario", description: "Productos y stock" },
   { to: "/dashboard/pos", icon: Receipt, label: "Punto de Venta", description: "Ventas rápidas" },
@@ -45,6 +50,7 @@ const NAV_ITEMS: NavItem[] = [
 
 const PAGE_TITLES: Record<string, string> = {
   "/dashboard": "Dashboard General",
+  "/dashboard/timers": "Timers Activos",
   "/dashboard/eventos": "Gestión de Eventos",
   "/dashboard/inventario": "Inventario de Menús",
   "/dashboard/pos": "Punto de Venta",
@@ -82,22 +88,27 @@ function UserAvatar({ name, size = "sm" }: { name: string; size?: "sm" | "md" })
 }
 
 function NotificationDropdown() {
-  const notifications = [
-    { id: 1, icon: "📅", text: "Evento mañana a las 14:00", time: "Hace 5 min", unread: true },
-    { id: 2, icon: "⚠️", text: "Stock bajo de cupcakes", time: "Hace 1 hora", unread: true },
-    { id: 3, icon: "💬", text: "Nuevo mensaje de cliente", time: "Hace 3 horas", unread: true },
-  ];
+  const { 
+    notifications, 
+    markAllAsRead, 
+    removeNotification, 
+    clearNotifications 
+  } = useNotifications();
+  
+  const unreadCount = notifications.filter(notification => !notification.read).length;
 
   return (
     <div className="dropdown dropdown-end">
       <div tabIndex={0} role="button" className="btn btn-ghost btn-circle relative group">
         <Bell className="w-5 h-5 group-hover:animate-swing" />
-        <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75" />
-          <span className="relative inline-flex rounded-full h-4 w-4 bg-error text-[10px] text-white items-center justify-center font-bold">
-            {notifications.length}
+        {unreadCount > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75" />
+            <span className="relative inline-flex rounded-full h-4 w-4 bg-error text-[10px] text-white items-center justify-center font-bold">
+              {unreadCount}
+            </span>
           </span>
-        </span>
+        )}
       </div>
       <div
         tabIndex={0}
@@ -105,21 +116,64 @@ function NotificationDropdown() {
       >
         <div className="px-4 py-3 border-b border-base-300/50 flex items-center justify-between">
           <h3 className="font-semibold text-sm">Notificaciones</h3>
-          <button className="btn btn-ghost btn-xs text-primary">Marcar todas</button>
+          <div className="flex items-center gap-1">
+            <button 
+              className="btn btn-ghost btn-xs text-primary"
+              onClick={clearNotifications}
+            >
+              Limpiar
+            </button>
+            <button 
+              className="btn btn-ghost btn-xs text-primary"
+              onClick={markAllAsRead}
+            >
+              Marcar todas
+            </button>
+          </div>
         </div>
-        <ul className="divide-y divide-base-300/30">
-          {notifications.map((n) => (
-            <li key={n.id}>
-              <button className="w-full text-left px-4 py-3 hover:bg-base-200/50 transition-colors flex items-start gap-3">
-                <span className="text-xl mt-0.5">{n.icon}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{n.text}</p>
-                  <p className="text-xs text-base-content/40 mt-0.5">{n.time}</p>
-                </div>
-                {n.unread && <span className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />}
-              </button>
-            </li>
-          ))}
+        <ul className="divide-y divide-base-300/30 max-h-96 overflow-y-auto">
+          {notifications.length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-8 gap-2">
+              <Bell className="w-12 h-12 text-base-content/20" />
+              <p className="text-sm text-base-content/50 text-center">
+                No hay notificaciones
+              </p>
+            </div>
+          ) : (
+            notifications.map((notification) => (
+              <li key={notification.id} className="relative group/item">
+                <button className="w-full text-left px-4 py-3 hover:bg-base-200/50 transition-colors flex items-start gap-3 pr-8">
+                  <span className="text-xl mt-0.5">
+                    {notification.type === "warning"
+                      ? "⚠️"
+                      : notification.type === "success"
+                      ? "✅"
+                      : "ℹ️"}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {notification.title}
+                    </p>
+                    <p className="text-xs text-base-content/60">
+                      {notification.message}
+                    </p>
+                  </div>
+                  {!notification.read && (
+                    <span className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />
+                  )}
+                </button>
+                <button
+                  className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/item:opacity-100 transition-opacity btn btn-ghost btn-xs btn-square"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeNotification(notification.id);
+                  }}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </li>
+            ))
+          )}
         </ul>
         <div className="px-4 py-2.5 border-t border-base-300/50">
           <button className="btn btn-ghost btn-sm btn-block text-primary">Ver todas</button>
@@ -375,6 +429,7 @@ export default function DashboardLayout() {
 
         <main className="flex-1 overflow-y-auto">
           <div className="p-4 lg:p-6 max-w-[1600px] mx-auto">
+            <TimerNotificationWatcher />
             <Outlet />
           </div>
         </main>

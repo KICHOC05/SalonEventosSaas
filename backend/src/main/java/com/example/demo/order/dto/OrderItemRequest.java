@@ -14,6 +14,8 @@ public class OrderItemRequest {
 
     private Integer quantity;
 
+    private String childName;
+
     private LocalDate eventDate;
 
     private LocalTime startTime;

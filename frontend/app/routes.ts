@@ -12,6 +12,7 @@ export default [
     // ── Dashboard protegido ──
     layout("components/DashLayout.tsx", [
         route("dashboard", "routes/dashboard/dashboard.tsx"),
+        route("dashboard/timers", "routes/dashboard/timers.tsx"),
         route("dashboard/eventos", "routes/dashboard/eventos.tsx"),
         route("dashboard/inventario", "routes/dashboard/inventario.tsx"),
         route("dashboard/pos", "routes/dashboard/pos.tsx"),
