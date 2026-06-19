@@ -17,6 +17,7 @@ import {
   X,
   Moon,
   Sun,
+  FileText,
 } from "lucide-react";
 import { useAuth } from "~/lib/auth";
 
@@ -31,6 +32,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: "/dashboard", icon: BarChart3, label: "Dashboard", description: "Vista general" },
   { to: "/dashboard/eventos", icon: Calendar, label: "Eventos", description: "Gestión de eventos" },
+  { to: "/dashboard/reportes-eventos", icon: FileText, label: "Reportes", description: "Reportes de eventos" },
   { to: "/dashboard/inventario", icon: PackageSearch, label: "Inventario", description: "Productos y stock" },
   { to: "/dashboard/pos", icon: Receipt, label: "Punto de Venta", description: "Ventas rápidas" },
   { to: "/dashboard/estadisticas", icon: PieChart, label: "Estadísticas", description: "Métricas y análisis" },
@@ -46,6 +48,7 @@ const NAV_ITEMS: NavItem[] = [
 const PAGE_TITLES: Record<string, string> = {
   "/dashboard": "Dashboard General",
   "/dashboard/eventos": "Gestión de Eventos",
+  "/dashboard/reportes-eventos": "Reportes de Eventos",
   "/dashboard/inventario": "Inventario de Menús",
   "/dashboard/pos": "Punto de Venta",
   "/dashboard/estadisticas": "Estadísticas de Ventas",

@@ -5,6 +5,8 @@ import com.example.demo.dashboard.dto.DashboardResponse.InventorySummary;
 import com.example.demo.dashboard.dto.DashboardResponse.LowStockProductDTO;
 import com.example.demo.dashboard.dto.DashboardResponse.UpcomingEventDTO;
 import com.example.demo.dashboard.dto.StatsResponse.PaymentBreakdown;
+import com.example.demo.event.model.Event;
+import com.example.demo.event.repository.EventRepository;
 import com.example.demo.order.repository.OrderItemRepository;
 import com.example.demo.order.repository.OrderRepository;
 import com.example.demo.payment.repository.PaymentRepository;
@@ -36,6 +38,7 @@ public class DashboardService {
         private final OrderRepository orderRepository;
         private final OrderItemRepository orderItemRepository;
         private final ProductRepository productRepository;
+        private final EventRepository eventRepository;
 
         private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         private static final int LOW_STOCK_THRESHOLD = 5;
@@ -79,7 +82,9 @@ public class DashboardService {
                                 orderItemRepository.topPackagesByTenant(tenantId, startOfMonth, endOfDay),
                                 5);
 
-                List<UpcomingEventDTO> upcomingEvents = Collections.emptyList();
+                List<UpcomingEventDTO> upcomingEvents = buildUpcomingEvents(tenantId, today);
+
+                long scheduledEventsCount = eventRepository.countByTenantWithDateAfter(tenantId, today);
 
                 return DashboardResponse.builder()
                                 .salesToday(salesToday)
@@ -92,7 +97,7 @@ public class DashboardService {
                                 .salesChart(salesChart)
                                 .topPackages(topPackages)
                                 .upcomingEvents(upcomingEvents)
-                                .scheduledEventsCount(0)
+                                .scheduledEventsCount((int) scheduledEventsCount)
                                 .build();
         }
 
@@ -152,9 +157,20 @@ public class DashboardService {
                                 .averageTicket(averageTicket)
                                 .growthPercentage(growthPercentage)
                                 .totalOrders(totalOrders)
-                                .scheduledEvents(0)
+                                .scheduledEvents((int) eventRepository.countByTenant_IdAndEventDateBetween(tenantId, startDate, today))
                                 .paymentBreakdown(paymentBreakdown)
                                 .build();
+        }
+
+        private List<UpcomingEventDTO> buildUpcomingEvents(Long tenantId, LocalDate from) {
+                List<Event> events = eventRepository.findNextUpcomingByTenant(tenantId, from);
+                return events.stream().map(e -> UpcomingEventDTO.builder()
+                                .date(e.getEventDate().toString())
+                                .client(e.getCustomerName())
+                                .packageName(e.getPackageProduct().getName())
+                                .children(e.getGuestCount())
+                                .status(e.getStatus().name())
+                                .build()).toList();
         }
 
         private BigDecimal safe(BigDecimal value) {

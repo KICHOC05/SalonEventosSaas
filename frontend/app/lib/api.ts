@@ -686,3 +686,170 @@ export async function fetchDashboard(): Promise<DashboardData> {
 export async function fetchStats(range: number = 7): Promise<StatsData> {
     return apiFetch<StatsData>(`/dashboard/stats?range=${range}`);
 }
+
+// ───────────────────────────────
+// EVENTOS
+// ───────────────────────────────
+
+export type EventStatus = "PENDING" | "PARTIAL" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
+export type EventPaymentType = "ADVANCE" | "FINAL";
+
+export interface EventRequest {
+    packagePublicId: string;
+    customerName: string;
+    childName?: string;
+    eventDate: string; // YYYY-MM-DD
+    startTime: string; // HH:mm
+    endTime: string;   // HH:mm
+    guestCount?: number;
+    notes?: string;
+}
+
+export interface EventResponse {
+    publicId: string;
+    packagePublicId: string;
+    packageName: string;
+    customerName: string;
+    childName: string | null;
+    eventDate: string;
+    startTime: string;
+    endTime: string;
+    guestCount: number | null;
+    notes: string | null;
+    totalAmount: number;
+    paidAmount: number;
+    pendingAmount: number;
+    cancellationFee: number;
+    refundedAmount: number;
+    status: EventStatus;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface EventPaymentRequest {
+    amount: number;
+    paymentMethod: PaymentMethod;
+    paymentType: EventPaymentType;
+    reference?: string;
+}
+
+export interface EventPaymentResponse {
+    publicId: string;
+    amount: number;
+    paymentMethod: string;
+    paymentType: string;
+    reference: string | null;
+    createdAt: string;
+}
+
+export interface EventDetailResponse {
+    publicId: string;
+    packagePublicId: string;
+    packageName: string;
+    packageDescription: string | null;
+    packagePrice: number;
+    customerName: string;
+    childName: string | null;
+    eventDate: string;
+    startTime: string;
+    endTime: string;
+    guestCount: number | null;
+    notes: string | null;
+    totalAmount: number;
+    paidAmount: number;
+    pendingAmount: number;
+    cancellationFee: number;
+    refundedAmount: number;
+    status: EventStatus;
+    createdAt: string;
+    updatedAt: string;
+    payments: EventPaymentResponse[];
+}
+
+export interface EventUpdateRequest {
+    customerName: string;
+    childName?: string;
+    guestCount?: number;
+    notes?: string;
+}
+
+export interface EventRescheduleRequest {
+    eventDate: string;
+    startTime: string;
+    endTime: string;
+}
+
+export interface EventReportResponse {
+    totalEvents: number;
+    confirmedEvents: number;
+    cancelledEvents: number;
+    pendingBalance: number;
+    revenue: number;
+}
+
+export async function createEvent(data: EventRequest): Promise<EventResponse> {
+    return apiFetch<EventResponse>("/events", {
+        method: "POST",
+        body: JSON.stringify(data),
+    });
+}
+
+export async function getDayEvents(date: string): Promise<EventResponse[]> {
+    return apiFetch<EventResponse[]>(`/events/day?date=${date}`);
+}
+
+export async function getMonthEvents(year: number, month: number): Promise<EventResponse[]> {
+    return apiFetch<EventResponse[]>(`/events/month?year=${year}&month=${month}`);
+}
+
+export async function getEventDetail(publicId: string): Promise<EventDetailResponse> {
+    return apiFetch<EventDetailResponse>(`/events/${publicId}`);
+}
+
+export async function updateEvent(publicId: string, data: EventUpdateRequest): Promise<EventResponse> {
+    return apiFetch<EventResponse>(`/events/${publicId}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+    });
+}
+
+export async function rescheduleEvent(publicId: string, data: EventRescheduleRequest): Promise<EventResponse> {
+    return apiFetch<EventResponse>(`/events/${publicId}/reschedule`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+    });
+}
+
+export async function cancelEvent(publicId: string): Promise<EventResponse> {
+    return apiFetch<EventResponse>(`/events/${publicId}/cancel`, {
+        method: "POST",
+    });
+}
+
+export async function completeEvent(publicId: string): Promise<EventResponse> {
+    return apiFetch<EventResponse>(`/events/${publicId}/complete`, {
+        method: "POST",
+    });
+}
+
+export async function registerEventPayment(publicId: string, data: EventPaymentRequest): Promise<EventPaymentResponse> {
+    return apiFetch<EventPaymentResponse>(`/events/${publicId}/payments`, {
+        method: "POST",
+        body: JSON.stringify(data),
+    });
+}
+
+export async function getEventReport(
+    startDate?: string,
+    endDate?: string,
+    status?: EventStatus,
+    branchId?: number
+): Promise<EventReportResponse> {
+    const params = new URLSearchParams();
+    if (startDate) params.append("startDate", startDate);
+    if (endDate) params.append("endDate", endDate);
+    if (status) params.append("status", status);
+    if (branchId !== undefined) params.append("branchId", branchId.toString());
+    const qs = params.toString();
+    return apiFetch<EventReportResponse>(`/events/report${qs ? `?${qs}` : ""}`);
+}

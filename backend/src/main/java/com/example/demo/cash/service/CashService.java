@@ -4,6 +4,7 @@ import com.example.demo.cash.dto.*;
 import com.example.demo.cash.model.CashRegister;
 import com.example.demo.cash.repository.CashRegisterRepository;
 import com.example.demo.common.enums.CashStatus;
+import com.example.demo.event.repository.EventPaymentRepository;
 import com.example.demo.payment.repository.PaymentRepository;
 import com.example.demo.security.TenantContext;
 import com.example.demo.branch.model.Branch;
@@ -26,6 +27,7 @@ public class CashService {
 
     private final CashRegisterRepository cashRegisterRepository;
     private final PaymentRepository paymentRepository;
+    private final EventPaymentRepository eventPaymentRepository;
     private final TenantRepository tenantRepository;
     private final BranchRepository branchRepository;
     private final UserRepository userRepository;
@@ -88,9 +90,17 @@ public class CashService {
         LocalDateTime end = LocalDateTime.now();
         Long branchId = cash.getBranch().getId();
 
-        BigDecimal cashSales = safe(paymentRepository.sumCashPayments(branchId, start, end));
-        BigDecimal cardSales = safe(paymentRepository.sumCardPayments(branchId, start, end));
-        BigDecimal transferSales = safe(paymentRepository.sumTransferPayments(branchId, start, end));
+        BigDecimal orderCash = safe(paymentRepository.sumCashPayments(branchId, start, end));
+        BigDecimal orderCard = safe(paymentRepository.sumCardPayments(branchId, start, end));
+        BigDecimal orderTransfer = safe(paymentRepository.sumTransferPayments(branchId, start, end));
+
+        BigDecimal eventCash = safe(eventPaymentRepository.sumCashEventPayments(branchId, start, end));
+        BigDecimal eventCard = safe(eventPaymentRepository.sumCardEventPayments(branchId, start, end));
+        BigDecimal eventTransfer = safe(eventPaymentRepository.sumTransferEventPayments(branchId, start, end));
+
+        BigDecimal cashSales = orderCash.add(eventCash);
+        BigDecimal cardSales = orderCard.add(eventCard);
+        BigDecimal transferSales = orderTransfer.add(eventTransfer);
 
         BigDecimal expectedCash = cash.getOpeningAmount().add(cashSales);
 
@@ -124,9 +134,17 @@ public class CashService {
         LocalDateTime end = LocalDateTime.now();
         Long branchId = cash.getBranch().getId();
 
-        BigDecimal cashSales = safe(paymentRepository.sumCashPayments(branchId, start, end));
-        BigDecimal cardSales = safe(paymentRepository.sumCardPayments(branchId, start, end));
-        BigDecimal transferSales = safe(paymentRepository.sumTransferPayments(branchId, start, end));
+        BigDecimal orderCash = safe(paymentRepository.sumCashPayments(branchId, start, end));
+        BigDecimal orderCard = safe(paymentRepository.sumCardPayments(branchId, start, end));
+        BigDecimal orderTransfer = safe(paymentRepository.sumTransferPayments(branchId, start, end));
+
+        BigDecimal eventCash = safe(eventPaymentRepository.sumCashEventPayments(branchId, start, end));
+        BigDecimal eventCard = safe(eventPaymentRepository.sumCardEventPayments(branchId, start, end));
+        BigDecimal eventTransfer = safe(eventPaymentRepository.sumTransferEventPayments(branchId, start, end));
+
+        BigDecimal cashSales = orderCash.add(eventCash);
+        BigDecimal cardSales = orderCard.add(eventCard);
+        BigDecimal transferSales = orderTransfer.add(eventTransfer);
 
         return mapToResponse(cash, cashSales, cardSales, transferSales);
     }
