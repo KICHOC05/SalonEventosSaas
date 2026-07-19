@@ -1,5 +1,6 @@
 package com.example.demo.common.exception;
 
+import com.example.demo.event.exception.ScheduleConflictException;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 
@@ -15,6 +16,19 @@ import java.util.Map;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+        // Manejar conflictos de horario de eventos
+        @ExceptionHandler(ScheduleConflictException.class)
+        public ResponseEntity<?> handleScheduleConflict(ScheduleConflictException ex) {
+                log.warn("Schedule conflict: {}", ex.getMessage());
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                                .body(Map.of(
+                                                "timestamp", LocalDateTime.now(),
+                                                "status", 409,
+                                                "error", "Conflict",
+                                                "code", "EVENT_TIME_CONFLICT",
+                                                "message", ex.getMessage()));
+        }
 
         @ExceptionHandler(EntityNotFoundException.class)
         public ResponseEntity<?> handleNotFound(EntityNotFoundException ex) {
@@ -33,6 +47,26 @@ public class GlobalExceptionHandler {
                                                 "timestamp", LocalDateTime.now(),
                                                 "status", 400,
                                                 "error", "Bad Request",
+                                                "message", ex.getMessage()));
+        }
+
+        @ExceptionHandler(IllegalStateException.class)
+        public ResponseEntity<?> handleIllegalState(IllegalStateException ex) {
+                return ResponseEntity.badRequest()
+                                .body(Map.of(
+                                                "timestamp", LocalDateTime.now(),
+                                                "status", 400,
+                                                "error", "Bad Request",
+                                                "message", ex.getMessage()));
+        }
+
+        @ExceptionHandler(SecurityException.class)
+        public ResponseEntity<?> handleSecurity(SecurityException ex) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                .body(Map.of(
+                                                "timestamp", LocalDateTime.now(),
+                                                "status", 403,
+                                                "error", "Forbidden",
                                                 "message", ex.getMessage()));
         }
 

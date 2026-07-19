@@ -5,6 +5,7 @@ import com.example.demo.order.service.OrderService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -14,22 +15,16 @@ public class OrderController {
 
     private final OrderService orderService;
 
-    // =========================
-    // CREATE ORDER
-    // =========================
-
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER','EMPLOYEE')")
     public OrderResponse createOrder(
             @Valid @RequestBody OrderCreateRequest request) {
 
         return orderService.createOrder(request);
     }
 
-    // =========================
-    // ADD ITEM (TIMER)
-    // =========================
-
     @PostMapping("/{orderPublicId}/items")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER','EMPLOYEE')")
     public OrderResponse addItem(
             @PathVariable String orderPublicId,
             @Valid @RequestBody OrderItemRequest request) {
@@ -37,11 +32,8 @@ public class OrderController {
         return orderService.addItem(orderPublicId, request);
     }
 
-    // =========================
-    // VOID ITEM
-    // =========================
-
     @PostMapping("/{orderPublicId}/items/{itemPublicId}/void")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER')")
     public OrderResponse voidItem(
             @PathVariable String orderPublicId,
             @PathVariable String itemPublicId) {
@@ -49,11 +41,8 @@ public class OrderController {
         return orderService.voidItem(orderPublicId, itemPublicId);
     }
 
-    // =========================
-    // UPDATE ITEM QUANTITY
-    // =========================
-
     @PutMapping("/{orderPublicId}/items/{itemPublicId}")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER')")
     public OrderResponse updateItemQuantity(
             @PathVariable String orderPublicId,
             @PathVariable String itemPublicId,
@@ -62,33 +51,24 @@ public class OrderController {
         return orderService.updateItemQuantity(orderPublicId, itemPublicId, request);
     }
 
-    // =========================
-    // GET ORDER
-    // =========================
-
     @GetMapping("/{orderPublicId}")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER','EMPLOYEE')")
     public OrderResponse getOrder(
             @PathVariable String orderPublicId) {
 
         return orderService.getOrder(orderPublicId);
     }
 
-    // =========================
-    // CLOSE ORDER
-    // =========================
-
     @PostMapping("/{orderPublicId}/close")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER')")
     public OrderResponse closeOrder(
             @PathVariable String orderPublicId) {
 
         return orderService.closeOrder(orderPublicId);
     }
 
-    // =========================
-    // CANCEL ORDER
-    // =========================
-
     @PostMapping("/{orderPublicId}/cancel")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     public OrderResponse cancelOrder(
             @PathVariable String orderPublicId) {
 

@@ -1,6 +1,6 @@
 package com.example.demo.product.service;
 
-import com.example.demo.common.context.TenantContext;
+import com.example.demo.security.TenantContext;
 import com.example.demo.common.enums.ProductType;
 import com.example.demo.product.dto.ProductRequest;
 import com.example.demo.product.dto.ProductResponse;

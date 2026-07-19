@@ -1,36 +1,31 @@
+// =====================================================
+// CORE API
+// =====================================================
+
 const API_BASE = "http://localhost:8080/api";
 
-export interface LoginRequest {
-    tenantPublicId: string;
-    email: string;
-    password: string;
-}
+export class ApiError extends Error {
+    status: number;
+    body: any;
 
-export interface LoginResponse {
-    token: string;
-    name: string;
-    email: string;
-    role: string;
-    userPublicId: string;
-    tenantId: number;
-    branchId: number;
-    businessName: string;
-    branchName: string;
-}
-
-export interface AuthUser {
-    token: string;
-    name: string;
-    email: string;
-    role: string;
-    userPublicId: string;
-    tenantId: number;
-    branchId: number;
-    businessName: string;
-    branchName: string;
+    constructor(message: string, status: number, body?: any) {
+        super(message);
+        this.name = "ApiError";
+        this.status = status;
+        this.body = body;
+    }
 }
 
 const AUTH_KEY = "pos_auth";
+
+function isTokenExpired(token: string): boolean {
+    try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        return payload.exp * 1000 < Date.now();
+    } catch {
+        return true;
+    }
+}
 
 export function getStoredAuth(): AuthUser | null {
     if (typeof window === "undefined") return null;
@@ -54,15 +49,6 @@ export function setStoredAuth(auth: AuthUser): void {
 
 export function clearStoredAuth(): void {
     localStorage.removeItem(AUTH_KEY);
-}
-
-function isTokenExpired(token: string): boolean {
-    try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        return payload.exp * 1000 < Date.now();
-    } catch {
-        return true;
-    }
 }
 
 export async function apiFetch<T>(
@@ -141,16 +127,65 @@ export async function apiFetch<T>(
     }
 }
 
-export class ApiError extends Error {
-    status: number;
-    body: any;
+// app/lib/api.ts - Agregar al final del archivo
 
-    constructor(message: string, status: number, body?: any) {
-        super(message);
-        this.name = "ApiError";
-        this.status = status;
-        this.body = body;
-    }
+// =====================================================
+// PUBLIC API - LANDING
+// =====================================================
+
+import type { Package, StatsResponse, PublicAvailabilityResponse } from "~/types/landing";
+
+const PUBLIC_API_BASE = "/api/public";
+
+export async function fetchPublicPackages(): Promise<Package[]> {
+  return apiFetch<Package[]>(`${PUBLIC_API_BASE}/packages`);
+}
+
+export async function fetchPublicStats(): Promise<StatsResponse> {
+  return apiFetch<StatsResponse>(`${PUBLIC_API_BASE}/stats`);
+}
+
+export async function fetchPublicAvailability(
+  month: number,
+  year: number
+): Promise<AvailabilityResponse> {
+  return apiFetch<AvailabilityResponse>(
+    `${PUBLIC_API_BASE}/availability?month=${month}&year=${year}`
+  );
+}
+
+// =====================================================
+// AUTH
+// =====================================================
+
+export interface LoginRequest {
+    tenantPublicId: string;
+    email: string;
+    password: string;
+}
+
+export interface LoginResponse {
+    token: string;
+    name: string;
+    email: string;
+    role: string;
+    userPublicId: string;
+    tenantId: number;
+    branchId: number;
+    businessName: string;
+    branchName: string;
+}
+
+export interface AuthUser {
+    token: string;
+    name: string;
+    email: string;
+    role: string;
+    userPublicId: string;
+    tenantId: number;
+    branchId: number;
+    businessName: string;
+    branchName: string;
 }
 
 export async function login(data: LoginRequest): Promise<LoginResponse> {
@@ -159,6 +194,10 @@ export async function login(data: LoginRequest): Promise<LoginResponse> {
         body: JSON.stringify(data),
     });
 }
+
+// =====================================================
+// USERS
+// =====================================================
 
 export interface UserResponse {
     publicId: string;
@@ -184,14 +223,6 @@ export interface UpdateUserRequest {
     branchId?: number;
     role?: "ADMIN" | "MANAGER" | "CASHIER" | "EMPLOYEE";
     active?: boolean;
-}
-
-export interface BranchResponse {
-    id: number;
-    publicId: string;
-    name: string;
-    address: string;
-    phone: string;
 }
 
 export async function fetchUsers(): Promise<UserResponse[]> {
@@ -241,37 +272,33 @@ export async function deleteUser(publicId: string): Promise<void> {
     });
 }
 
+// =====================================================
+// BRANCHES
+// =====================================================
+
+export interface BranchResponse {
+    id: number;
+    publicId: string;
+    name: string;
+    address: string;
+    phone: string;
+}
+
 export async function fetchBranches(): Promise<BranchResponse[]> {
     return apiFetch<BranchResponse[]>("/branches");
 }
 
-export type ProductType = "PRODUCT" | "SERVICE" | "PACKAGE";
+// =====================================================
+// PRODUCTS
+// =====================================================
 
-export interface ProductResponse {
-    publicId: string;
-    name: string;
-    description: string | null;
-    price: number;
-    stock: number | null;
-    type: ProductType;
-    active: boolean;
-    department: string;
-    durationMinutes: number | null;
-    requiresSchedule: boolean | null;
-    createdAt: string;
-    updatedAt: string;
-}
+import type {
+    ProductType,
+    ProductResponse,
+    ProductRequest
+} from "~/types/product";
 
-export interface ProductRequest {
-    name: string;
-    description?: string;
-    price: number;
-    stock?: number;
-    type: ProductType;
-    department: string;
-    durationMinutes?: number;
-    requiresSchedule?: boolean;
-}
+export type { ProductType, ProductResponse, ProductRequest } from "~/types/product";
 
 export async function fetchProducts(): Promise<ProductResponse[]> {
     return apiFetch<ProductResponse[]>("/products");
@@ -310,6 +337,139 @@ export async function toggleProductStatus(publicId: string): Promise<ProductResp
     });
 }
 
+// =====================================================
+// EVENTS
+// =====================================================
+
+import type {
+  EventResponse,
+  EventCalendarResponse,
+  AvailabilityResponse,
+  CreateEventRequest,
+  UpdateEventRequest,
+  RescheduleEventRequest,
+  EventRescheduleHistoryResponse,
+  RegisterEventPaymentRequest,
+  EventPaymentResponse,
+  EventPaymentMethod,
+} from "~/types/event";
+
+
+
+export async function fetchEvents(): Promise<EventResponse[]> {
+  return apiFetch<EventResponse[]>("/events");
+}
+
+export async function fetchEventByPublicId(
+  publicId: string
+): Promise<EventResponse> {
+  return apiFetch<EventResponse>(`/events/${publicId}`);
+}
+
+export async function createEvent(
+  data: CreateEventRequest
+): Promise<EventResponse> {
+  return apiFetch<EventResponse>("/events", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateEvent(
+  publicId: string,
+  data: UpdateEventRequest
+): Promise<EventResponse> {
+  return apiFetch<EventResponse>(`/events/${publicId}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+// ✅ CORREGIDO - Usar DELETE con la URL correcta (sin /cancel)
+export async function cancelEvent(publicId: string): Promise<void> {
+  return apiFetch<void>(`/events/${publicId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function checkEventAvailability(
+  date: string,
+  start: string,
+  end: string,
+  excludePublicId?: string
+): Promise<AvailabilityResponse> {
+  let url = `/events/availability?date=${date}&start=${start}&end=${end}`;
+  if (excludePublicId) {
+    url += `&excludePublicId=${excludePublicId}`;
+  }
+  return apiFetch<AvailabilityResponse>(url);
+}
+
+export async function fetchEventCalendar(
+  from: string,
+  to: string
+): Promise<EventCalendarResponse[]> {
+  return apiFetch<EventCalendarResponse[]>(
+    `/events/calendar?from=${from}&to=${to}`
+  );
+}
+
+// =====================================================
+// EVENT WORKFLOW
+// =====================================================
+
+export async function confirmEvent(publicId: string): Promise<EventResponse> {
+  return apiFetch<EventResponse>(`/events/${publicId}/confirm`, { method: "POST" });
+}
+
+export async function startEvent(publicId: string): Promise<EventResponse> {
+  return apiFetch<EventResponse>(`/events/${publicId}/start`, { method: "POST" });
+}
+
+export async function completeEvent(publicId: string): Promise<EventResponse> {
+  return apiFetch<EventResponse>(`/events/${publicId}/complete`, { method: "POST" });
+}
+
+export async function rescheduleEvent(
+  publicId: string,
+  data: RescheduleEventRequest
+): Promise<EventResponse> {
+  return apiFetch<EventResponse>(`/events/${publicId}/reschedule`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchEventRescheduleHistory(
+  publicId: string
+): Promise<EventRescheduleHistoryResponse[]> {
+  return apiFetch<EventRescheduleHistoryResponse[]>(`/events/${publicId}/reschedule-history`);
+}
+
+// =====================================================
+// EVENT PAYMENTS
+// =====================================================
+
+export async function registerEventPayment(
+  publicId: string,
+  data: RegisterEventPaymentRequest
+): Promise<EventPaymentResponse> {
+  return apiFetch<EventPaymentResponse>(`/events/${publicId}/payments`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchEventPayments(
+  publicId: string
+): Promise<EventPaymentResponse[]> {
+  return apiFetch<EventPaymentResponse[]>(`/events/${publicId}/payments`);
+}
+
+// =====================================================
+// CASH REGISTER
+// =====================================================
+
 export interface CashRegisterResponse {
     publicId: string;
     openingAmount: number;
@@ -334,136 +494,6 @@ export interface CloseCashRequest {
     countedCash: number;
 }
 
-export interface OrderCreateRequest {
-    customerName?: string;
-    childName?: string;
-}
-
-export interface OrderItemRequest {
-    productPublicId: string;
-    quantity: number;
-
-    childName?: string;
-
-    eventDate?: string;
-    startTime?: string;
-    endTime?: string;
-}
-
-export interface UpdateOrderItemRequest {
-    quantity: number;
-}
-
-export interface OrderItemResponse {
-  publicId: string;
-  productPublicId: string;
-  productName: string;
-  quantity: number;
-  unitPrice: number;
-  subtotal: number;
-  status: string;
-  warning?: string;
-
-  childName?: string;
-}
-
-export type OrderStatus = "OPEN" | "CLOSED" | "CANCELLED" | "PARTIALLY_PAID";
-
-export interface OrderResponse {
-    publicId: string;
-    status: OrderStatus;
-    customerName: string | null;
-    childName: string | null;
-    totalAmount: number;
-    subtotal: number;
-    tax: number;
-    createdAt: string;
-    closedAt: string | null;
-    items: OrderItemResponse[];
-}
-
-export interface ActiveSessionResponse {
-    itemPublicId: string;
-
-    childName: string;
-    productName: string;
-
-    sessionStart: string;
-    sessionEnd: string;
-
-    remainingSeconds: number;
-    remainingMinutes: number;
-
-    durationMinutes: number;
-
-    expiringSoon: boolean;
-
-    expired: boolean;
-
-    progressPercent: number;
-
-    status: string;
-
-    customerName: string;
-    orderPublicId: string;
-}
-
-export interface TimerDashboardResponse {
-    activeSessions: number;
-
-    expiringSoon: number;
-
-    finishedToday: number;
-
-    expired: number;
-
-    totalTodayMinutes: number;
-}
-
-export type PaymentMethod = "CASH" | "CARD" | "TRANSFER";
-
-export interface PaymentRequest {
-    amount: number;
-    paymentMethod: PaymentMethod;
-    reference?: string;
-}
-
-export interface PaymentResponse {
-    orderTotal: number;
-    totalPaid: number;
-    remainingAmount: number;
-    change: number;
-    amountReceived: number;
-    amountApplied: number;
-    paymentMethod: string;
-}
-
-export interface TaxSettingsResponse {
-    taxEnabled: boolean;
-    taxRate: number;
-}
-
-export interface TimerHistoryResponse {
-    itemPublicId: string;
-    orderPublicId: string;
-    customerName: string;
-    childName: string;
-    productName: string;
-    sessionStart: string;
-    sessionEnd: string;
-    durationMinutes: number;
-    status: string;
-}
-
-export interface PageResponse<T> {
-    content: T[];
-    totalElements: number;
-    totalPages: number;
-    size: number;
-    number: number;
-}
-
-
 export async function openCashRegister(
     data: OpenCashRequest
 ): Promise<CashRegisterResponse> {
@@ -484,6 +514,55 @@ export async function closeCashRegister(
         method: "POST",
         body: JSON.stringify(data),
     });
+}
+
+// =====================================================
+// ORDERS
+// =====================================================
+
+export type OrderStatus = "OPEN" | "CLOSED" | "CANCELLED" | "PARTIALLY_PAID";
+
+export interface OrderCreateRequest {
+    customerName?: string;
+    childName?: string;
+}
+
+export interface OrderItemRequest {
+    productPublicId: string;
+    quantity: number;
+    childName?: string;
+    eventDate?: string;
+    startTime?: string;
+    endTime?: string;
+}
+
+export interface UpdateOrderItemRequest {
+    quantity: number;
+}
+
+export interface OrderItemResponse {
+    publicId: string;
+    productPublicId: string;
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+    subtotal: number;
+    status: string;
+    warning?: string;
+    childName?: string;
+}
+
+export interface OrderResponse {
+    publicId: string;
+    status: OrderStatus;
+    customerName: string | null;
+    childName: string | null;
+    totalAmount: number;
+    subtotal: number;
+    tax: number;
+    createdAt: string;
+    closedAt: string | null;
+    items: OrderItemResponse[];
 }
 
 export async function createOrder(
@@ -542,20 +621,6 @@ export async function cancelOrder(publicId: string): Promise<OrderResponse> {
     });
 }
 
-export async function registerPayment(
-    orderPublicId: string,
-    data: PaymentRequest
-): Promise<PaymentResponse> {
-    return apiFetch<PaymentResponse>(`/orders/${orderPublicId}/payments`, {
-        method: "POST",
-        body: JSON.stringify(data),
-    });
-}
-
-export async function getTaxSettings(): Promise<TaxSettingsResponse> {
-    return apiFetch<TaxSettingsResponse>("/settings/tax");
-}
-
 export async function getOrderTicket(orderPublicId: string): Promise<string> {
     const auth = getStoredAuth();
     const headers: Record<string, string> = {};
@@ -581,6 +646,52 @@ export async function getOrderTicket(orderPublicId: string): Promise<string> {
     return res.text();
 }
 
+// =====================================================
+// PAYMENTS
+// =====================================================
+
+export type PaymentMethod = "CASH" | "CARD" | "TRANSFER";
+
+export interface PaymentRequest {
+    amount: number;
+    paymentMethod: PaymentMethod;
+    reference?: string;
+}
+
+export interface PaymentResponse {
+    orderTotal: number;
+    totalPaid: number;
+    remainingAmount: number;
+    change: number;
+    amountReceived: number;
+    amountApplied: number;
+    paymentMethod: string;
+}
+
+export async function registerPayment(
+    orderPublicId: string,
+    data: PaymentRequest
+): Promise<PaymentResponse> {
+    return apiFetch<PaymentResponse>(`/orders/${orderPublicId}/payments`, {
+        method: "POST",
+        body: JSON.stringify(data),
+    });
+}
+
+// =====================================================
+// SETTINGS
+// =====================================================
+
+export interface TaxSettingsResponse {
+    taxEnabled: boolean;
+    taxRate: number;
+}
+
+export interface TaxSettingsRequest {
+    taxEnabled: boolean;
+    taxRate: number;
+}
+
 export interface CompanySettingsResponse {
     businessName: string;
     phone: string | null;
@@ -596,6 +707,19 @@ export interface CompanySettingsRequest {
 
 export interface TenantSettingsResponse {
     inventoryMode: "STRICT" | "WARNING" | "DISABLED";
+}
+
+export async function getTaxSettings(): Promise<TaxSettingsResponse> {
+    return apiFetch<TaxSettingsResponse>("/settings/tax");
+}
+
+export async function updateTaxSettings(
+    data: TaxSettingsRequest
+): Promise<TaxSettingsResponse> {
+    return apiFetch<TaxSettingsResponse>("/settings/tax", {
+        method: "PUT",
+        body: JSON.stringify(data),
+    });
 }
 
 export async function getCompanySettings(): Promise<CompanySettingsResponse> {
@@ -645,7 +769,6 @@ export async function uploadLogo(file: File): Promise<{ logoUrl: string }> {
     return res.json();
 }
 
-
 export async function getTenantSettings(): Promise<TenantSettingsResponse> {
     return apiFetch<TenantSettingsResponse>("/settings");
 }
@@ -659,21 +782,9 @@ export async function updateInventoryMode(
     });
 }
 
-
-export interface TaxSettingsRequest {
-    taxEnabled: boolean;
-    taxRate: number;
-}
-
-export async function updateTaxSettings(
-    data: TaxSettingsRequest
-): Promise<TaxSettingsResponse> {
-    return apiFetch<TaxSettingsResponse>("/settings/tax", {
-        method: "PUT",
-        body: JSON.stringify(data),
-    });
-}
-
+// =====================================================
+// DASHBOARD
+// =====================================================
 
 export interface InventorySummary {
     totalProducts: number;
@@ -751,9 +862,54 @@ export async function fetchStats(range: number = 7): Promise<StatsData> {
     return apiFetch<StatsData>(`/dashboard/stats?range=${range}`);
 }
 
-// =========================
+// =====================================================
 // TIMERS
-// =========================
+// =====================================================
+
+export interface ActiveSessionResponse {
+    itemPublicId: string;
+    childName: string;
+    productName: string;
+    sessionStart: string;
+    sessionEnd: string;
+    remainingSeconds: number;
+    remainingMinutes: number;
+    durationMinutes: number;
+    expiringSoon: boolean;
+    expired: boolean;
+    progressPercent: number;
+    status: string;
+    customerName: string;
+    orderPublicId: string;
+}
+
+export interface TimerDashboardResponse {
+    activeSessions: number;
+    expiringSoon: number;
+    finishedToday: number;
+    expired: number;
+    totalTodayMinutes: number;
+}
+
+export interface TimerHistoryResponse {
+    itemPublicId: string;
+    orderPublicId: string;
+    customerName: string;
+    childName: string;
+    productName: string;
+    sessionStart: string;
+    sessionEnd: string;
+    durationMinutes: number;
+    status: string;
+}
+
+export interface PageResponse<T> {
+    content: T[];
+    totalElements: number;
+    totalPages: number;
+    size: number;
+    number: number;
+}
 
 export async function fetchActiveSessions(): Promise<ActiveSessionResponse[]> {
     return apiFetch<ActiveSessionResponse[]>("/timers/active");

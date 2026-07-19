@@ -23,13 +23,13 @@ public class ProductController {
         return productService.create(request);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER','EMPLOYEE')")
     @GetMapping
     public List<ProductResponse> findAll() {
         return productService.findAll();
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER','EMPLOYEE')")
     @GetMapping("/{publicId}")
     public ProductResponse findByPublicId(@PathVariable String publicId) {
         return productService.findByPublicId(publicId);

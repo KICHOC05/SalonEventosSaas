@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Link } from "react-router";
+import { Link, Navigate } from "react-router";
 import {
   DollarSign,
   CalendarCheck,
@@ -149,6 +149,10 @@ export default function Dashboard() {
 
   const { user, role, isAdmin, isManager } = useAuth();
   const canViewUsers = isAdmin || isManager;
+
+  if (role === "CASHIER" || role === "EMPLOYEE") {
+    return <Navigate to="/dashboard/pos" replace />;
+  }
 
   const loadDashboard = useCallback(async () => {
     try {

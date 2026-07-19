@@ -20,7 +20,7 @@ public class CashController {
 
 
     @PostMapping("/open")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER','EMPLOYEE')")
     public CashRegisterResponse openCash(
             @Valid @RequestBody OpenCashRequest request) {
 
@@ -29,7 +29,7 @@ public class CashController {
 
 
     @GetMapping("/current")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER','EMPLOYEE')")
     public CashRegisterResponse currentCash() {
 
         return cashService.currentCash();

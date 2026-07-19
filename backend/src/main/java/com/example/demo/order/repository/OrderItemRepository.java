@@ -22,7 +22,6 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
 
     Optional<OrderItem> findByPublicIdAndOrder_PublicId(String publicId, String orderPublicId);
 
-
     @Query("""
                 SELECT oi.product.publicId, oi.product.name,
                        SUM(oi.quantity), SUM(oi.subtotal)
@@ -40,7 +39,6 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end);
 
-
     @Query("""
                 SELECT oi.product.publicId, oi.product.name,
                        SUM(oi.quantity), SUM(oi.subtotal)
@@ -57,7 +55,6 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
             @Param("tenantId") Long tenantId,
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end);
-
 
     @Query("""
                 SELECT oi.product.publicId, oi.product.name,
@@ -77,8 +74,7 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
             
     List<OrderItem> findByActiveTrueAndSessionEndBeforeAndOrder_Tenant_Id(
             LocalDateTime now,
-            Long tenantId
-    );
+            Long tenantId);
 
     @Query("""
         SELECT oi
@@ -92,36 +88,43 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
         ORDER BY oi.sessionEnd ASC
         """)
     List<OrderItem> findActiveTimers(
-            @Param("tenantId") Long tenantId
-    );
+            @Param("tenantId") Long tenantId);
+
+    @Query("""
+        SELECT oi
+        FROM OrderItem oi
+        WHERE oi.active = true
+        AND oi.product.type = com.example.demo.common.enums.ProductType.SERVICE
+        AND oi.sessionStart IS NOT NULL
+        AND oi.sessionEnd IS NOT NULL
+        AND oi.durationMinutes IS NOT NULL
+        ORDER BY oi.sessionEnd ASC
+        """)
+    List<OrderItem> findAllActiveTimers();
 
     List<OrderItem> findByEventDateAndOrder_Tenant_Id(
             LocalDate date,
-            Long tenantId
-    );
+            Long tenantId);
 
     List<OrderItem> findByActiveTrueAndOrder_Tenant_Id(Long tenantId);
 
     List<OrderItem> findByStatusAndOrder_Tenant_Id(
             OrderItemStatus status,
-            Long tenantId
-    );
+            Long tenantId);
 
     List<OrderItem> findByStatusAndOrder_Tenant_IdAndSessionStartBetween(
             OrderItemStatus status,
             Long tenantId,
             LocalDateTime start,
-            LocalDateTime end
-    );
+            LocalDateTime end);
 
     Long countByActiveTrueAndOrder_Tenant_Id(Long tenantId);
 
     Long countByStatusAndOrder_Tenant_Id(
             OrderItemStatus status,
-            Long tenantId
-    );
+            Long tenantId);
 
-  @Query("""
+    @Query("""
         SELECT oi
         FROM OrderItem oi
         WHERE oi.order.tenant.id = :tenantId
@@ -131,22 +134,21 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
         AND oi.durationMinutes IS NOT NULL
         AND (:status IS NULL OR oi.status = :status)
         AND (
-        :search IS NULL
-        OR LOWER(COALESCE(oi.childName,'')) LIKE LOWER(CONCAT('%',:search,'%'))
-        OR LOWER(COALESCE(oi.order.customerName,'')) LIKE LOWER(CONCAT('%',:search,'%'))
+            :search IS NULL
+            OR LOWER(COALESCE(oi.childName,'')) LIKE LOWER(CONCAT('%',:search,'%'))
+            OR LOWER(COALESCE(oi.order.customerName,'')) LIKE LOWER(CONCAT('%',:search,'%'))
         )
         AND (
-        :startDate IS NULL
-        OR oi.sessionStart BETWEEN :startDate AND :endDate
+            :startDate IS NULL OR :endDate IS NULL
+            OR oi.sessionStart >= :startDate AND oi.sessionStart < :endDate
         )
         ORDER BY oi.sessionStart DESC
         """)
     Page<OrderItem> findTimerHistory(
-        @Param("tenantId") Long tenantId,
-        @Param("status") OrderItemStatus status,
-        @Param("search") String search,
-        @Param("startDate") LocalDateTime startDate,
-        @Param("endDate") LocalDateTime endDate,
-        Pageable pageable
-);
+            @Param("tenantId") Long tenantId,
+            @Param("status") OrderItemStatus status,
+            @Param("search") String search,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate,
+            Pageable pageable);
 }

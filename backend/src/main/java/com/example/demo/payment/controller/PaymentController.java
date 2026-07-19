@@ -18,7 +18,7 @@ public class PaymentController {
     private final PaymentService paymentService;
 
     @PostMapping("/{orderPublicId}/payments")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER','EMPLOYEE')")
     public PaymentResponse registerPayment(
             @PathVariable String orderPublicId,
             @Valid @RequestBody PaymentRequest request) {

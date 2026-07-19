@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Outlet, NavLink, useLocation, useNavigate } from "react-router";
+import { Outlet, NavLink, useLocation, useNavigate, useSearchParams } from "react-router";
 import {
   Rocket,
   BarChart3,
@@ -15,14 +15,14 @@ import {
   Menu,
   Building2,
   X,
-  Moon,
-  Sun,
   Clock,
+  History,
 } from "lucide-react";
 import { useAuth } from "~/lib/auth";
 import { useNotifications } from "~/context/NotificationContext";
 
 import TimerNotificationWatcher from "~/components/TimerNotificationWatcher";
+import EventNotificationWatcher from "~/components/events/EventNotificationWatcher";
 
 interface NavItem {
   to: string;
@@ -30,20 +30,69 @@ interface NavItem {
   label: string;
   description?: string;
   roles?: string[];
+  children?: NavItem[];
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: "/dashboard", icon: BarChart3, label: "Dashboard", description: "Vista general" },
-  { to: "/dashboard/timers", icon: Clock, label: "Timers", description: "Sesiones activas" },
-  { to: "/dashboard/eventos", icon: Calendar, label: "Eventos", description: "Gestión de eventos" },
-  { to: "/dashboard/inventario", icon: PackageSearch, label: "Inventario", description: "Productos y stock" },
-  { to: "/dashboard/pos", icon: Receipt, label: "Punto de Venta", description: "Ventas rápidas" },
-  { to: "/dashboard/estadisticas", icon: PieChart, label: "Estadísticas", description: "Métricas y análisis" },
+  {
+    to: "/dashboard",
+    icon: BarChart3,
+    label: "Dashboard",
+    description: "Vista general",
+    roles: ["ADMIN", "MANAGER"],
+  },
+  {
+    to: "/dashboard/timers",
+    icon: Clock,
+    label: "Timers",
+    description: "Sesiones activas",
+    roles: ["ADMIN", "MANAGER", "CASHIER", "EMPLOYEE"],
+  },
+  {
+    to: "/dashboard/eventos",
+    icon: Calendar,
+    label: "Eventos",
+    description: "Gestión de eventos",
+    roles: ["ADMIN", "MANAGER", "CASHIER", "EMPLOYEE"],
+    children: [
+      { to: "/dashboard/eventos?tab=calendar", icon: Calendar, label: "Calendario" },
+      { to: "/dashboard/eventos?tab=history", icon: History, label: "Historial" },
+      { to: "/dashboard/eventos?tab=stats", icon: BarChart3, label: "Estadísticas" },
+    ],
+  },
+  {
+    to: "/dashboard/inventario",
+    icon: PackageSearch,
+    label: "Inventario",
+    description: "Productos y stock",
+    roles: ["ADMIN", "MANAGER", "EMPLOYEE"],
+  },
+  {
+    to: "/dashboard/pos",
+    icon: Receipt,
+    label: "Punto de Venta",
+    description: "Ventas rápidas",
+    roles: ["ADMIN", "MANAGER", "CASHIER", "EMPLOYEE"],
+  },
+  {
+    to: "/dashboard/estadisticas",
+    icon: PieChart,
+    label: "Estadísticas",
+    description: "Métricas y análisis",
+    roles: ["ADMIN", "MANAGER"],
+  },
   {
     to: "/dashboard/usuarios",
     icon: Users,
     label: "Usuarios",
     description: "Gestión de accesos",
+    roles: ["ADMIN", "MANAGER"],
+  },
+  {
+    to: "/dashboard/configuracion",
+    icon: Settings,
+    label: "Configuración",
+    description: "Ajustes del sistema",
     roles: ["ADMIN", "MANAGER"],
   },
 ];
@@ -188,8 +237,11 @@ export default function DashboardLayout() {
   const navigate = useNavigate();
   const { user, role, isAuthenticated, isLoading, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [searchParams] = useSearchParams();
 
   const pageTitle = PAGE_TITLES[location.pathname] ?? "Space Kids";
+
+
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -199,7 +251,7 @@ export default function DashboardLayout() {
 
   useEffect(() => {
     setSidebarOpen(false);
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   if (isLoading) {
     return (
@@ -277,45 +329,90 @@ export default function DashboardLayout() {
 
         <nav className="flex-1 overflow-y-auto py-4 px-3">
           <div className="space-y-1">
-            {visibleNavItems.map(({ to, icon: Icon, label, description }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={to === "/dashboard"}
-                className={({ isActive }) => `
-                  group flex items-center gap-3 px-3 py-2.5 rounded-xl
-                  transition-all duration-200 relative
-                  ${isActive
-                    ? "bg-primary/10 text-primary font-semibold shadow-sm"
-                    : "text-base-content/60 hover:text-base-content hover:bg-base-200/80"
-                  }
-                `}
-              >
-                {({ isActive }) => (
-                  <>
-                    {isActive && (
+            {visibleNavItems.map((item) => {
+              const Icon = item.icon;
+              const hasChildren = item.children && item.children.length > 0;
+              const isParentActive = item.to === "/dashboard"
+                ? location.pathname === "/dashboard"
+                : location.pathname.startsWith(item.to);
+
+              return (
+                <div key={item.to}>
+                  <div className="relative flex items-center">
+                    {isParentActive && (
                       <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full" />
                     )}
-                    <div
-                      className={`
-                        w-9 h-9 rounded-lg flex items-center justify-center transition-colors flex-shrink-0
-                        ${isActive ? "bg-primary/15" : "bg-base-200/60 group-hover:bg-base-300/60"}
+                    <NavLink
+                      to={item.to}
+                      end={!hasChildren && item.to === "/dashboard"}
+                      className={({ isActive }) => `
+                        group flex items-center gap-3 px-3 py-2.5 rounded-xl
+                        transition-all duration-200 flex-1 min-w-0
+                        ${(isActive || (hasChildren && isParentActive))
+                          ? "bg-primary/10 text-primary font-semibold shadow-sm"
+                          : "text-base-content/60 hover:text-base-content hover:bg-base-200/80"
+                        }
                       `}
                     >
-                      <Icon className="w-[18px] h-[18px]" />
+                      <div
+                        className={`
+                          w-9 h-9 rounded-lg flex items-center justify-center transition-colors flex-shrink-0
+                          ${(isParentActive) ? "bg-primary/15" : "bg-base-200/60 group-hover:bg-base-300/60"}
+                        `}
+                      >
+                        <Icon className="w-[18px] h-[18px]" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm leading-tight truncate">{item.label}</p>
+                        {item.description && (
+                          <p className="text-[10px] text-base-content/40 leading-tight mt-0.5 truncate">
+                            {item.description}
+                          </p>
+                        )}
+                      </div>
+                    </NavLink>
+                  </div>
+
+                  {hasChildren && isParentActive && (
+                    <div className="relative ml-6 mt-2 mb-4 pl-4 space-y-1.5">
+                      <div className="absolute left-0 top-2 bottom-2 w-px bg-primary/20 rounded-full" />
+                      {item.children!.map((child) => {
+                        const ChildIcon = child.icon;
+                        const childTab = child.to.includes("tab=")
+                          ? child.to.split("tab=")[1]
+                          : "calendar";
+                        const currentTab = searchParams.get("tab") || "calendar";
+                        const isChildActive = childTab === currentTab;
+
+                        return (
+                          <NavLink
+                            key={child.to}
+                            to={child.to}
+                            end
+                            className={`group flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-sm ${
+                              isChildActive
+                                ? "bg-primary/10 text-primary font-semibold border border-primary/10"
+                                : "text-base-content/55 hover:text-base-content hover:bg-base-200/40"
+                            }`}
+                          >
+                            <div
+                              className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
+                                isChildActive
+                                  ? "bg-primary/15 text-primary"
+                                  : "text-base-content/45 group-hover:text-base-content"
+                              }`}
+                            >
+                              <ChildIcon className="w-4 h-4" />
+                            </div>
+                            <span>{child.label}</span>
+                          </NavLink>
+                        );
+                      })}
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm leading-tight">{label}</p>
-                      {description && (
-                        <p className="text-[10px] text-base-content/40 leading-tight mt-0.5 truncate">
-                          {description}
-                        </p>
-                      )}
-                    </div>
-                  </>
-                )}
-              </NavLink>
-            ))}
+                  )}
+                </div>
+              );
+            })}
           </div>
         </nav>
 
@@ -331,15 +428,6 @@ export default function DashboardLayout() {
               </div>
             </div>
             <div className="flex gap-1">
-              <NavLink
-                to="/dashboard/configuracion"
-                className={({ isActive }) =>
-                  `btn btn-sm flex-1 gap-1.5 ${isActive ? "btn-primary" : "btn-ghost"}`
-                }
-              >
-                <Settings className="w-3.5 h-3.5" />
-                <span className="text-xs">Ajustes</span>
-              </NavLink>
               <button
                 onClick={handleLogout}
                 className="btn btn-sm btn-ghost text-error hover:bg-error/10 gap-1.5 flex-1"
@@ -406,13 +494,15 @@ export default function DashboardLayout() {
                     </div>
                   </div>
                   <div className="p-2">
-                    <NavLink
-                      to="/dashboard/configuracion"
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-base-200/80 transition-colors text-sm"
-                    >
-                      <Settings className="w-4 h-4 text-base-content/50" />
-                      Configuración
-                    </NavLink>
+                    {["ADMIN", "MANAGER"].includes(role) && (
+                      <NavLink
+                        to="/dashboard/configuracion"
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-base-200/80 transition-colors text-sm"
+                      >
+                        <Settings className="w-4 h-4 text-base-content/50" />
+                        Configuración
+                      </NavLink>
+                    )}
                     <button
                       onClick={handleLogout}
                       className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-error/10 transition-colors text-sm text-error w-full"
@@ -430,6 +520,7 @@ export default function DashboardLayout() {
         <main className="flex-1 overflow-y-auto">
           <div className="p-4 lg:p-6 max-w-[1600px] mx-auto">
             <TimerNotificationWatcher />
+            <EventNotificationWatcher />
             <Outlet />
           </div>
         </main>

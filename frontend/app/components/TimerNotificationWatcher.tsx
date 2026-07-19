@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
-import { fetchActiveSessions, type ActiveSessionResponse } from "~/lib/api";
+import { useEffect, useRef, useMemo } from "react";
+import { Client } from "@stomp/stompjs";
+import { useAuth } from "~/lib/auth";
 import { useNotifications } from "~/context/NotificationContext";
 import toast from "react-hot-toast";
 
@@ -24,14 +25,31 @@ const saveSet = (key: string, set: Set<string>) => {
   }
 };
 
+interface TimerNotificationEvent {
+  type: "FIVE_MIN" | "ONE_MIN" | "FINISHED";
+  timerId: string;
+  childName: string;
+  message: string;
+  remainingSeconds: number;
+  timestamp: string;
+}
+
 export default function TimerNotificationWatcher() {
   const { addNotification } = useNotifications();
-  const previousTimersRef = useRef<Map<string, ActiveSessionResponse>>(new Map());
+  const { user, isAuthenticated } = useAuth();
+  const clientRef = useRef<Client | null>(null);
+
   const fiveMinRef = useRef<Set<string>>(new Set());
   const oneMinRef = useRef<Set<string>>(new Set());
   const finishedRef = useRef<Set<string>>(new Set());
 
-  // Cargar datos persistentes desde localStorage al montar
+  const tenantId = user?.tenantId;
+  const token = user?.token;
+  const topic = useMemo(() => {
+    if (!tenantId) return null;
+    return `/topic/tenant/${tenantId}/timers`;
+  }, [tenantId]);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const fiveMin = localStorage.getItem(STORAGE_KEYS.FIVE_MIN);
@@ -50,98 +68,105 @@ export default function TimerNotificationWatcher() {
     }
   }, []);
 
-  const checkTimers = async () => {
-    try {
-      const timers = await fetchActiveSessions();
-      const currentIds = new Set(timers.map(t => t.itemPublicId));
-
-      // Detectar timers que desaparecieron (finalizaron)
-      previousTimersRef.current.forEach((oldTimer, timerId) => {
-        const stillExists = currentIds.has(timerId);
-        
-        if (!stillExists) {
-          if (!finishedRef.current.has(timerId)) {
-            finishedRef.current.add(timerId);
-            saveSet(STORAGE_KEYS.FINISHED, finishedRef.current);
-            
-            // Limpiar de otros sets si existen
-            if (fiveMinRef.current.has(timerId)) {
-              fiveMinRef.current.delete(timerId);
-              saveSet(STORAGE_KEYS.FIVE_MIN, fiveMinRef.current);
-            }
-            if (oneMinRef.current.has(timerId)) {
-              oneMinRef.current.delete(timerId);
-              saveSet(STORAGE_KEYS.ONE_MIN, oneMinRef.current);
-            }
-            
-            addNotification({
-              title: "Sesión finalizada",
-              message: `${oldTimer.childName} ha finalizado`,
-              type: "success",
-            });
-            toast.success(`✅ ${oldTimer.childName} finalizó`);
-            playSound("/sounds/finished.mp3");
-          }
-        }
-      });
-
-      // Procesar timers actuales para alertas de tiempo
-      timers.forEach((timer) => {
-        const { itemPublicId, childName, remainingSeconds } = timer;
-
-        // Menos de 5 minutos (entre 1 minuto y 5 minutos)
-        if (remainingSeconds <= 300 && remainingSeconds > 60) {
-          if (!fiveMinRef.current.has(itemPublicId)) {
-            fiveMinRef.current.add(itemPublicId);
-            saveSet(STORAGE_KEYS.FIVE_MIN, fiveMinRef.current);
-            
-            addNotification({
-              title: "Timer próximo a finalizar",
-              message: `${childName} termina en menos de 5 minutos`,
-              type: "warning",
-            });
-            toast("⚠️ Timer próximo a finalizar");
-            playSound("/sounds/warning.mp3");
-          }
-        }
-
-        // Menos de 1 minuto (entre 1 segundo y 1 minuto)
-        if (remainingSeconds <= 60 && remainingSeconds > 0) {
-          if (!oneMinRef.current.has(itemPublicId)) {
-            oneMinRef.current.add(itemPublicId);
-            saveSet(STORAGE_KEYS.ONE_MIN, oneMinRef.current);
-            
-            addNotification({
-              title: "Último minuto",
-              message: `${childName} termina en menos de 1 minuto`,
-              type: "warning",
-            });
-            toast("⏳ Último minuto");
-            playSound("/sounds/warning.mp3");
-          }
-        }
-      });
-
-      // Actualizar snapshot de timers activos
-      previousTimersRef.current = new Map(
-        timers.map(timer => [timer.itemPublicId, timer])
-      );
-      
-    } catch (error) {
-      console.error("Error checking timers:", error);
-    }
-  };
-
   useEffect(() => {
-    // Ejecutar inmediatamente al montar
-    checkTimers();
+    if (!isAuthenticated || !token || !topic) return;
 
-    // Configurar intervalo cada 10 segundos
-    const interval = setInterval(checkTimers, 10000);
+    const client = new Client({
+      brokerURL: "ws://localhost:8080/ws",
+      connectHeaders: {
+        Authorization: `Bearer ${token}`,
+      },
+      reconnectDelay: 5000,
+      heartbeatIncoming: 4000,
+      heartbeatOutgoing: 4000,
+      debug: (msg) => {
+        console.log("[WS]", msg);
+      },
+      onConnect: () => {
+        console.log("[WS] Connected, subscribing to", topic);
 
-    // Limpiar intervalo al desmontar
-    return () => clearInterval(interval);
-  }, []);
+        client.subscribe(topic, (message) => {
+          try {
+            const event: TimerNotificationEvent = JSON.parse(message.body);
+            console.log("[WS] Event", event);
+
+            const { type, timerId, childName, message: eventMessage } = event;
+
+            switch (type) {
+              case "FIVE_MIN":
+                if (!fiveMinRef.current.has(timerId)) {
+                  fiveMinRef.current.add(timerId);
+                  saveSet(STORAGE_KEYS.FIVE_MIN, fiveMinRef.current);
+
+                  addNotification({
+                    title: "Timer próximo a finalizar",
+                    message: eventMessage,
+                    type: "warning",
+                  });
+                  toast("⚠️ Timer próximo a finalizar");
+                  playSound("/sounds/warning.mp3");
+                }
+                break;
+
+              case "ONE_MIN":
+                if (!oneMinRef.current.has(timerId)) {
+                  oneMinRef.current.add(timerId);
+                  saveSet(STORAGE_KEYS.ONE_MIN, oneMinRef.current);
+
+                  addNotification({
+                    title: "Último minuto",
+                    message: eventMessage,
+                    type: "warning",
+                  });
+                  toast("⏳ Último minuto");
+                  playSound("/sounds/warning.mp3");
+                }
+                break;
+
+              case "FINISHED":
+                if (!finishedRef.current.has(timerId)) {
+                  finishedRef.current.add(timerId);
+                  saveSet(STORAGE_KEYS.FINISHED, finishedRef.current);
+
+                  if (fiveMinRef.current.has(timerId)) {
+                    fiveMinRef.current.delete(timerId);
+                    saveSet(STORAGE_KEYS.FIVE_MIN, fiveMinRef.current);
+                  }
+                  if (oneMinRef.current.has(timerId)) {
+                    oneMinRef.current.delete(timerId);
+                    saveSet(STORAGE_KEYS.ONE_MIN, oneMinRef.current);
+                  }
+
+                  addNotification({
+                    title: "Sesión finalizada",
+                    message: eventMessage,
+                    type: "success",
+                  });
+                  toast.success(`✅ ${childName} finalizó`);
+                  playSound("/sounds/finished.mp3");
+                }
+                break;
+            }
+          } catch (error) {
+            console.error("[WS] Error parsing message:", error);
+          }
+        });
+      },
+      onStompError: (frame) => {
+        console.error("[WS] STOMP error:", frame);
+      },
+    });
+
+    client.activate();
+    clientRef.current = client;
+
+    return () => {
+      if (clientRef.current) {
+        console.log("[WS] Disconnecting...");
+        clientRef.current.deactivate();
+      }
+    };
+  }, [addNotification, isAuthenticated, token, topic]);
 
   return null;
 }
