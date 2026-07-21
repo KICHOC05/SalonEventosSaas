@@ -487,15 +487,23 @@ export interface CashRegisterResponse {
 }
 
 export interface OpenCashRequest {
-    openingAmount: number;
+    openingAmount?: number;
 }
 
 export interface CloseCashRequest {
     countedCash: number;
 }
 
+export interface CashSettingsResponse {
+    defaultOpeningAmount: number;
+}
+
+export interface UpdateCashOpeningAmountRequest {
+    defaultOpeningAmount: number;
+}
+
 export async function openCashRegister(
-    data: OpenCashRequest
+    data: OpenCashRequest = {}
 ): Promise<CashRegisterResponse> {
     return apiFetch<CashRegisterResponse>("/cash/open", {
         method: "POST",
@@ -512,6 +520,19 @@ export async function closeCashRegister(
 ): Promise<CashRegisterResponse> {
     return apiFetch<CashRegisterResponse>("/cash/close", {
         method: "POST",
+        body: JSON.stringify(data),
+    });
+}
+
+export async function getCashSettings(): Promise<CashSettingsResponse> {
+    return apiFetch<CashSettingsResponse>("/cash/settings");
+}
+
+export async function updateCashOpeningAmount(
+    data: UpdateCashOpeningAmountRequest
+): Promise<CashSettingsResponse> {
+    return apiFetch<CashSettingsResponse>("/cash/settings/opening-amount", {
+        method: "PUT",
         body: JSON.stringify(data),
     });
 }

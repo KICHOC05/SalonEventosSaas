@@ -43,15 +43,19 @@ import {
     getCurrentCash,
     openCashRegister,
     closeCashRegister,
+    getCashSettings,
+    updateCashOpeningAmount,
     getOrderTicket,
     type ProductResponse,
     type OrderResponse,
     type OrderItemResponse,
     type CashRegisterResponse,
+    type CashSettingsResponse,
     type PaymentResponse as PaymentRes,
     type PaymentMethod,
 } from "~/lib/api";
 import { buildMeta } from "~/lib/meta";
+import { useAuth } from "~/lib/auth";
 
 export function meta() {
     return buildMeta("Punto de venta", "Gestión de ventas y caja");
@@ -340,12 +344,18 @@ export default function POS() {
     const [toasts, setToasts] = useState<Toast[]>([]);
 
     const [showOpenCash, setShowOpenCash] = useState(false);
-    const [openingAmount, setOpeningAmount] = useState("");
     const [openingCash, setOpeningCash] = useState(false);
     const [showCloseCash, setShowCloseCash] = useState(false);
     const [countedCash, setCountedCash] = useState("");
     const [closingCash, setClosingCash] = useState(false);
     const [closeResult, setCloseResult] = useState<CashRegisterResponse | null>(null);
+
+    const [cashSettings, setCashSettings] = useState<CashSettingsResponse | null>(null);
+    const [settingsAmount, setSettingsAmount] = useState("");
+    const [settingsSaving, setSettingsSaving] = useState(false);
+
+    const { isAdmin, isManager } = useAuth();
+    const canConfigureCash = isAdmin || isManager;
 
     const [showPayment, setShowPayment] = useState(false);
     const [payAmount, setPayAmount] = useState("");
@@ -422,6 +432,12 @@ export default function POS() {
             setLoadingProducts(false);
         }
         try {
+            const settings = await getCashSettings();
+            setCashSettings(settings);
+            setSettingsAmount(String(settings.defaultOpeningAmount));
+        } catch {
+        }
+        try {
             const c = await getCurrentCash();
             setCash(c);
             setCashOpen(true);
@@ -476,23 +492,35 @@ export default function POS() {
 
 
     async function handleOpenCash() {
-        const amount = parseFloat(openingAmount);
-        if (isNaN(amount) || amount < 0) {
-            showToast("error", "Monto de apertura inválido");
-            return;
-        }
         setOpeningCash(true);
         try {
-            const c = await openCashRegister({ openingAmount: amount });
+            const c = await openCashRegister();
             setCash(c);
             setCashOpen(true);
             setShowOpenCash(false);
-            setOpeningAmount("");
             showToast("success", "Caja abierta correctamente");
         } catch (e: any) {
             showToast("error", e.message || "Error al abrir caja");
         } finally {
             setOpeningCash(false);
+        }
+    }
+
+    async function handleSaveSettings() {
+        const amount = parseFloat(settingsAmount);
+        if (isNaN(amount) || amount < 0) {
+            showToast("error", "Monto inválido");
+            return;
+        }
+        setSettingsSaving(true);
+        try {
+            const updated = await updateCashOpeningAmount({ defaultOpeningAmount: amount });
+            setCashSettings(updated);
+            showToast("success", "Monto fijo guardado");
+        } catch (e: any) {
+            showToast("error", e.message || "Error al guardar");
+        } finally {
+            setSettingsSaving(false);
         }
     }
 
@@ -1368,49 +1396,88 @@ export default function POS() {
 
             <Modal
                 open={showOpenCash}
-                onClose={() => setShowOpenCash(false)}
+                onClose={() => {
+                    if (!openingCash) setShowOpenCash(false);
+                }}
                 maxWidth="max-w-sm"
+                closable={!openingCash}
             >
                 <ModalHeader
                     icon={Vault}
                     iconColor="bg-success/10 text-success"
                     title="Abrir Caja"
                     subtitle="Ingresa el monto inicial para comenzar"
-                    onClose={() => setShowOpenCash(false)}
+                    onClose={!openingCash ? () => setShowOpenCash(false) : undefined}
                 />
                 <div className="p-5 pt-4 space-y-4">
-                    <fieldset className="fieldset">
-                        <legend className="fieldset-legend text-xs flex items-center gap-1">
-                            <DollarSign className="w-3 h-3" /> Monto inicial
-                        </legend>
-                        <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="0.00"
-                            className="input input-bordered w-full text-lg font-bold"
-                            value={openingAmount}
-                            onChange={(e) => setOpeningAmount(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleOpenCash()}
-                            autoFocus
-                        />
-                    </fieldset>
+                    {canConfigureCash ? (
+                        <>
+                            <fieldset className="fieldset">
+                                <legend className="fieldset-legend text-xs flex items-center gap-1">
+                                    <DollarSign className="w-3 h-3" /> Monto inicial
+                                </legend>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="0.00"
+                                    className="input input-bordered w-full text-lg font-bold"
+                                    value={settingsAmount}
+                                    onChange={(e) => setSettingsAmount(e.target.value)}
+                                    onKeyDown={(e) => e.key === "Enter" && handleOpenCash()}
+                                    autoFocus
+                                />
+                            </fieldset>
 
-                    <div className="flex gap-2 flex-wrap">
-                        {[0, 500, 1000, 2000].map((amt) => (
+                            <div className="flex gap-2 flex-wrap">
+                                {[0, 500, 1000, 2000].map((amt) => (
+                                    <button
+                                        key={amt}
+                                        className={`btn btn-sm rounded-lg ${settingsAmount === amt.toString() ? "btn-success" : "btn-ghost"
+                                            }`}
+                                        onClick={() => setSettingsAmount(amt.toString())}
+                                    >
+                                        {amt === 0 ? "Sin fondo" : formatMoney(amt)}
+                                    </button>
+                                ))}
+                            </div>
+
                             <button
-                                key={amt}
-                                className={`btn btn-sm rounded-lg ${openingAmount === amt.toString() ? "btn-success" : "btn-ghost"
-                                    }`}
-                                onClick={() => setOpeningAmount(amt.toString())}
+                                className="btn btn-outline btn-sm w-full gap-2"
+                                onClick={handleSaveSettings}
+                                disabled={settingsSaving}
                             >
-                                {amt === 0 ? "Sin fondo" : formatMoney(amt)}
+                                {settingsSaving ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <Vault className="w-4 h-4" />
+                                )}
+                                Guardar monto fijo
                             </button>
-                        ))}
-                    </div>
+                        </>
+                    ) : (
+                        <div className="space-y-3">
+                            <div className="bg-base-200/50 rounded-xl p-4 text-center">
+                                <p className="text-sm text-base-content/50 mb-1">
+                                    Monto fijo de apertura
+                                </p>
+                                <p className="text-3xl font-extrabold text-primary">
+                                    {cashSettings ? formatMoney(cashSettings.defaultOpeningAmount) : "-"}
+                                </p>
+                            </div>
+                            <p className="text-xs text-base-content/40 text-center flex items-center justify-center gap-1">
+                                <AlertTriangle className="w-3 h-3" />
+                                Monto fijo configurado por administrador o gerente.
+                            </p>
+                        </div>
+                    )}
 
                     <div className="flex gap-2">
-                        <button className="btn btn-ghost flex-1" onClick={() => setShowOpenCash(false)}>
+                        <button
+                            className="btn btn-ghost flex-1"
+                            onClick={() => setShowOpenCash(false)}
+                            disabled={openingCash}
+                        >
                             Cancelar
                         </button>
                         <button

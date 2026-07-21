@@ -29,13 +29,10 @@ public class CashService {
     private final TenantRepository tenantRepository;
     private final BranchRepository branchRepository;
     private final UserRepository userRepository;
+    private final CashSettingsService cashSettingsService;
 
 
     public CashRegisterResponse openCash(OpenCashRequest request) {
-
-        if (request.getOpeningAmount() == null) {
-            throw new IllegalArgumentException("openingAmount es obligatorio");
-        }
 
         Long tenantId = TenantContext.getTenantId();
         Long branchId = TenantContext.getBranchId();
@@ -58,7 +55,7 @@ public class CashService {
         cash.setTenant(tenant);
         cash.setBranch(branch);
         cash.setOpenedBy(user);
-        cash.setOpeningAmount(request.getOpeningAmount());
+        cash.setOpeningAmount(cashSettingsService.getDefaultOpeningAmount(branchId));
         cash.setOpenedAt(LocalDateTime.now());
         cash.setStatus(CashStatus.OPEN);
 
