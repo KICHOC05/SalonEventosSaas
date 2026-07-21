@@ -35,6 +35,12 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+function toNumber(value: any): number {
+  if (value === null || value === undefined) return 0;
+  const num = Number(value);
+  return isNaN(num) ? 0 : num;
+}
+
 function StatCard({
   title,
   value,
@@ -159,6 +165,35 @@ export default function Dashboard() {
       setLoading(true);
       setError(null);
       const result = await fetchDashboard();
+
+      if (result) {
+        result.salesToday = toNumber(result.salesToday);
+        result.salesYesterday = toNumber(result.salesYesterday);
+        result.salesTodayGrowth = toNumber(result.salesTodayGrowth);
+        result.monthlyRevenue = toNumber(result.monthlyRevenue);
+        result.previousMonthRevenue = toNumber(result.previousMonthRevenue);
+        result.monthlyGrowth = toNumber(result.monthlyGrowth);
+        result.scheduledEventsCount = toNumber(result.scheduledEventsCount);
+
+        if (result.salesChart?.data) {
+          result.salesChart.data = result.salesChart.data.map(toNumber);
+        }
+
+        if (result.topPackages) {
+          result.topPackages = result.topPackages.map((p) => ({
+            ...p,
+            quantitySold: toNumber(p.quantitySold),
+            totalRevenue: toNumber(p.totalRevenue),
+          }));
+        }
+
+        if (result.inventory) {
+          result.inventory.totalProducts = toNumber(result.inventory.totalProducts);
+          result.inventory.totalStock = toNumber(result.inventory.totalStock);
+          result.inventory.lowStockCount = toNumber(result.inventory.lowStockCount);
+        }
+      }
+
       setData(result);
     } catch (err: any) {
       setError(err.message || "Error al cargar dashboard");

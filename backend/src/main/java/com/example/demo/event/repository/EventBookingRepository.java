@@ -7,7 +7,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
@@ -104,4 +106,19 @@ public interface EventBookingRepository extends JpaRepository<EventBooking, Long
             @Param("to") LocalDate to,
             @Param("statuses") List<EventStatus> statuses
     );
+
+    @Query("""
+        SELECT eb.packageProduct.publicId, eb.packageProduct.name,
+               COUNT(eb), COALESCE(SUM(eb.eventPrice), 0)
+        FROM EventBooking eb
+        WHERE eb.tenant.id = :tenantId
+          AND eb.createdAt BETWEEN :start AND :end
+          AND eb.status <> com.example.demo.common.enums.EventStatus.CANCELLED
+        GROUP BY eb.packageProduct.publicId, eb.packageProduct.name
+        ORDER BY COUNT(eb) DESC
+    """)
+    List<Object[]> topEventPackagesByTenant(
+            @Param("tenantId") Long tenantId,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
 }

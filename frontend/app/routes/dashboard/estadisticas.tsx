@@ -15,8 +15,6 @@ import {
     BarChart3,
     Calendar,
     Sparkles,
-    ArrowUp,
-    ArrowDown,
     Banknote,
     CreditCard,
     Building,

@@ -19,7 +19,6 @@ import {
     Sparkles,
     Package,
     Zap,
-    Gift,
     User,
     Baby,
     Hash,
@@ -59,11 +58,12 @@ export function meta() {
 }
 
 
+const POS_ALLOWED_TYPES = ["PRODUCT", "SERVICE"];
+
 const PRODUCT_TABS = [
     { id: "all", label: "Todos", icon: Package },
     { id: "PRODUCT", label: "Productos", icon: Package },
     { id: "SERVICE", label: "Servicios", icon: Zap },
-    { id: "PACKAGE", label: "Paquetes", icon: Gift },
 ];
 
 const TYPE_CONFIG: Record<string, { emoji: string; gradient: string }> = {
@@ -612,7 +612,7 @@ export default function POS() {
             return;
         }
 
-        // PRODUCT y PACKAGE siguen flujo normal
+        // Los PRODUCT siguen el flujo normal
         if (addingProductId) return;
         setAddingProductId(product.publicId);
 
@@ -813,6 +813,7 @@ export default function POS() {
 
 
     const filtered = products.filter((p) => {
+        if (!POS_ALLOWED_TYPES.includes(p.type)) return false;
         const matchesTab = activeProductTab === "all" || p.type === activeProductTab;
         const matchesSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
         return matchesTab && matchesSearch;
@@ -904,7 +905,7 @@ export default function POS() {
                         <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-base-content/30" />
                         <input
                             type="text"
-                            placeholder="Buscar producto, servicio o paquete..."
+                            placeholder="Buscar producto o servicio..."
                             className="input input-bordered w-full pl-11 rounded-xl"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}

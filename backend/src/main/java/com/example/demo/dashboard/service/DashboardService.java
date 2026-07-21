@@ -1,10 +1,13 @@
 package com.example.demo.dashboard.service;
 
+import com.example.demo.common.enums.EventStatus;
 import com.example.demo.dashboard.dto.*;
 import com.example.demo.dashboard.dto.DashboardResponse.InventorySummary;
 import com.example.demo.dashboard.dto.DashboardResponse.LowStockProductDTO;
 import com.example.demo.dashboard.dto.DashboardResponse.UpcomingEventDTO;
 import com.example.demo.dashboard.dto.StatsResponse.PaymentBreakdown;
+import com.example.demo.event.model.EventBooking;
+import com.example.demo.event.repository.EventBookingRepository;
 import com.example.demo.order.repository.OrderItemRepository;
 import com.example.demo.order.repository.OrderRepository;
 import com.example.demo.payment.repository.PaymentRepository;
@@ -36,9 +39,15 @@ public class DashboardService {
         private final OrderRepository orderRepository;
         private final OrderItemRepository orderItemRepository;
         private final ProductRepository productRepository;
+        private final EventBookingRepository eventBookingRepository;
 
         private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         private static final int LOW_STOCK_THRESHOLD = 5;
+        private static final int UPCOMING_EVENTS_LIMIT = 5;
+        private static final List<EventStatus> UPCOMING_EVENT_STATUSES = List.of(
+                        EventStatus.PENDING_DEPOSIT,
+                        EventStatus.CONFIRMED,
+                        EventStatus.IN_PROGRESS);
 
         public DashboardResponse getDashboard() {
 
@@ -79,7 +88,19 @@ public class DashboardService {
                                 orderItemRepository.topPackagesByTenant(tenantId, startOfMonth, endOfDay),
                                 5);
 
-                List<UpcomingEventDTO> upcomingEvents = Collections.emptyList();
+                List<EventBooking> upcomingBookings = eventBookingRepository
+                                .findByTenant_IdAndEventDateBetweenOrderByEventDateAscStartTimeAsc(
+                                                tenantId, today, today.plusYears(1))
+                                .stream()
+                                .filter(e -> UPCOMING_EVENT_STATUSES.contains(e.getStatus()))
+                                .collect(Collectors.toList());
+
+                int scheduledEventsCount = upcomingBookings.size();
+
+                List<UpcomingEventDTO> upcomingEvents = upcomingBookings.stream()
+                                .limit(UPCOMING_EVENTS_LIMIT)
+                                .map(this::toUpcomingEventDTO)
+                                .collect(Collectors.toList());
 
                 return DashboardResponse.builder()
                                 .salesToday(salesToday)
@@ -92,7 +113,7 @@ public class DashboardService {
                                 .salesChart(salesChart)
                                 .topPackages(topPackages)
                                 .upcomingEvents(upcomingEvents)
-                                .scheduledEventsCount(0)
+                                .scheduledEventsCount(scheduledEventsCount)
                                 .build();
         }
 
@@ -133,7 +154,7 @@ public class DashboardService {
                                 orderItemRepository.topProductsByTenant(tenantId, start, endOfDay), null);
 
                 List<TopItemDTO> salesByPackage = buildTopItems(
-                                orderItemRepository.topPackagesByTenant(tenantId, start, endOfDay), null);
+                                eventBookingRepository.topEventPackagesByTenant(tenantId, start, endOfDay), null);
 
                 List<TopItemDTO> topProducts = buildTopItems(
                                 orderItemRepository.allItemsSoldByTenant(tenantId, start, endOfDay), 10);
@@ -155,6 +176,25 @@ public class DashboardService {
                                 .scheduledEvents(0)
                                 .paymentBreakdown(paymentBreakdown)
                                 .build();
+        }
+
+        private UpcomingEventDTO toUpcomingEventDTO(EventBooking event) {
+                return UpcomingEventDTO.builder()
+                                .date(event.getEventDate() != null ? event.getEventDate().format(DATE_FMT) : "")
+                                .client(event.getCustomerName())
+                                .packageName(event.getPackageProduct() != null
+                                                ? event.getPackageProduct().getName()
+                                                : "-")
+                                .children(event.getGuestChildren() != null ? event.getGuestChildren() : 0)
+                                .status(mapEventStatus(event.getStatus()))
+                                .build();
+        }
+
+        private String mapEventStatus(EventStatus status) {
+                if (status == null)
+                        return "PENDING";
+                // El badge del dashboard ya maneja CONFIRMED / PENDING / CANCELLED
+                return status == EventStatus.PENDING_DEPOSIT ? "PENDING" : status.name();
         }
 
         private BigDecimal safe(BigDecimal value) {
