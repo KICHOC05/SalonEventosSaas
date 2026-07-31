@@ -17,6 +17,7 @@ import {
   X,
   Clock,
   History,
+  FileText,
 } from "lucide-react";
 import { useAuth } from "~/lib/auth";
 import { useNotifications } from "~/context/NotificationContext";
@@ -73,6 +74,9 @@ const NAV_ITEMS: NavItem[] = [
     label: "Punto de Venta",
     description: "Ventas rápidas",
     roles: ["ADMIN", "MANAGER", "CASHIER", "EMPLOYEE"],
+    children: [
+      { to: "/dashboard/pos/reportes", icon: FileText, label: "Reportes de venta", roles: ["ADMIN", "MANAGER"] },
+    ],
   },
   {
     to: "/dashboard/estadisticas",
@@ -103,6 +107,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/dashboard/eventos": "Gestión de Eventos",
   "/dashboard/inventario": "Inventario de Menús",
   "/dashboard/pos": "Punto de Venta",
+  "/dashboard/pos/reportes": "Reportes de Venta",
   "/dashboard/estadisticas": "Estadísticas de Ventas",
   "/dashboard/usuarios": "Gestión de Usuarios",
   "/dashboard/configuracion": "Configuración",
@@ -376,38 +381,38 @@ export default function DashboardLayout() {
                   {hasChildren && isParentActive && (
                     <div className="relative ml-6 mt-2 mb-4 pl-4 space-y-1.5">
                       <div className="absolute left-0 top-2 bottom-2 w-px bg-primary/20 rounded-full" />
-                      {item.children!.map((child) => {
-                        const ChildIcon = child.icon;
-                        const childTab = child.to.includes("tab=")
-                          ? child.to.split("tab=")[1]
-                          : "calendar";
-                        const currentTab = searchParams.get("tab") || "calendar";
-                        const isChildActive = childTab === currentTab;
+                      {item.children!
+                        .filter((child) => !child.roles || child.roles.includes(role))
+                        .map((child) => {
+                          const ChildIcon = child.icon;
+                          const isChildActive = child.to.includes("tab=")
+                            ? (child.to.split("tab=")[1] === (searchParams.get("tab") || "calendar"))
+                            : location.pathname === child.to;
 
-                        return (
-                          <NavLink
-                            key={child.to}
-                            to={child.to}
-                            end
-                            className={`group flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-sm ${
-                              isChildActive
-                                ? "bg-primary/10 text-primary font-semibold border border-primary/10"
-                                : "text-base-content/55 hover:text-base-content hover:bg-base-200/40"
-                            }`}
-                          >
-                            <div
-                              className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
+                          return (
+                            <NavLink
+                              key={child.to}
+                              to={child.to}
+                              end
+                              className={`group flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-sm ${
                                 isChildActive
-                                  ? "bg-primary/15 text-primary"
-                                  : "text-base-content/45 group-hover:text-base-content"
+                                  ? "bg-primary/10 text-primary font-semibold border border-primary/10"
+                                  : "text-base-content/55 hover:text-base-content hover:bg-base-200/40"
                               }`}
                             >
-                              <ChildIcon className="w-4 h-4" />
-                            </div>
-                            <span>{child.label}</span>
-                          </NavLink>
-                        );
-                      })}
+                              <div
+                                className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
+                                  isChildActive
+                                    ? "bg-primary/15 text-primary"
+                                    : "text-base-content/45 group-hover:text-base-content"
+                                }`}
+                              >
+                                <ChildIcon className="w-4 h-4" />
+                              </div>
+                              <span>{child.label}</span>
+                            </NavLink>
+                          );
+                        })}
                     </div>
                   )}
                 </div>

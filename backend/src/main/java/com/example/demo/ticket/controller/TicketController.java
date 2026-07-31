@@ -15,7 +15,7 @@ public class TicketController {
     private final TicketService ticketService;
 
     @GetMapping("/{orderPublicId}/ticket")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER','EMPLOYEE')")
     public String getTicket(@PathVariable String orderPublicId) {
         return ticketService.generateTicket(orderPublicId);
     }

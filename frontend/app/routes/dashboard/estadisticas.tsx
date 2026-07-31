@@ -4,6 +4,7 @@ import "~/lib/chartSetup";
 import { darkGridOptions, darkDoughnutOptions } from "~/lib/chartSetup";
 import { buildMeta } from "~/lib/meta";
 import { fetchStats, type StatsData } from "~/lib/api";
+import { useAuth } from "~/lib/auth";
 import {
     Loader2,
     AlertTriangle,
@@ -143,6 +144,7 @@ export default function Estadisticas() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedRange, setSelectedRange] = useState(7);
+    const { isAdmin } = useAuth();
 
     const loadStats = useCallback(async (range: number) => {
         try {
@@ -558,6 +560,7 @@ export default function Estadisticas() {
                     </div>
                 </div>
             ) : null}
+
         </div>
     );
 }

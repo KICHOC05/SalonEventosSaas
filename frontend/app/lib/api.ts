@@ -884,6 +884,29 @@ export async function fetchStats(range: number = 7): Promise<StatsData> {
 }
 
 // =====================================================
+// REPORTS (ADMIN ONLY)
+// =====================================================
+
+export async function getSalesReportTicket(period: "WEEKLY" | "BIWEEKLY" | "MONTHLY"): Promise<string> {
+    const auth = getStoredAuth();
+    const headers: Record<string, string> = {};
+    if (auth?.token) {
+        headers["Authorization"] = `Bearer ${auth.token}`;
+    }
+
+    const res = await fetch(`${API_BASE}/reports/sales-ticket?period=${period}`, { headers });
+
+    if (res.status === 401 || res.status === 403) {
+        throw new ApiError(res.status === 403 ? "Solo administradores pueden generar reportes" : "Sesión expirada", res.status);
+    }
+    if (!res.ok) {
+        throw new ApiError("Error al generar reporte", res.status);
+    }
+
+    return res.text();
+}
+
+// =====================================================
 // TIMERS
 // =====================================================
 

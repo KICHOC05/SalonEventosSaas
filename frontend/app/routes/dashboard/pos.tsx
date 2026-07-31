@@ -417,6 +417,12 @@ export default function POS() {
     }, []);
 
     useEffect(() => {
+        if (showOpenCash && cashSettings) {
+            setSettingsAmount(String(cashSettings.defaultOpeningAmount));
+        }
+    }, [showOpenCash, cashSettings]);
+
+    useEffect(() => {
         if (orderTabs.length > 0 && !orderTabs.find((t) => t.id === activeOrderTabId)) {
             setActiveOrderTabId(orderTabs[0].id);
         }
@@ -436,6 +442,8 @@ export default function POS() {
             setCashSettings(settings);
             setSettingsAmount(String(settings.defaultOpeningAmount));
         } catch {
+            setCashSettings({ defaultOpeningAmount: 0 });
+            setSettingsAmount("0");
         }
         try {
             const c = await getCurrentCash();
@@ -492,6 +500,29 @@ export default function POS() {
 
 
     async function handleOpenCash() {
+        if (canConfigureCash) {
+            const amount = parseFloat(settingsAmount);
+            if (isNaN(amount) || amount < 0) {
+                showToast("error", "Monto inválido. Ingresa un valor antes de abrir caja.");
+                return;
+            }
+            setOpeningCash(true);
+            try {
+                const updated = await updateCashOpeningAmount({ defaultOpeningAmount: amount });
+                setCashSettings(updated);
+                const c = await openCashRegister();
+                setCash(c);
+                setCashOpen(true);
+                setShowOpenCash(false);
+                showToast("success", "Caja abierta correctamente");
+            } catch (e: any) {
+                showToast("error", e.message || "Error al abrir caja");
+            } finally {
+                setOpeningCash(false);
+            }
+            return;
+        }
+
         setOpeningCash(true);
         try {
             const c = await openCashRegister();

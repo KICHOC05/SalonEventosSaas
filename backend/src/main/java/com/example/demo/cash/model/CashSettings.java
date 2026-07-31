@@ -26,9 +26,12 @@ public class CashSettings {
     private String publicId;
 
     @PrePersist
-    public void generatePublicId() {
+    public void prePersist() {
         if (publicId == null) {
             publicId = UUID.randomUUID().toString();
+        }
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
         }
     }
 
@@ -51,11 +54,4 @@ public class CashSettings {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "updated_by")
     private User updatedBy;
-
-    @PrePersist
-    public void onCreate() {
-        if (createdAt == null) {
-            createdAt = LocalDateTime.now();
-        }
-    }
 }

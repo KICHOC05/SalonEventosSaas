@@ -33,7 +33,7 @@ public class OrderController {
     }
 
     @PostMapping("/{orderPublicId}/items/{itemPublicId}/void")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER','EMPLOYEE')")
     public OrderResponse voidItem(
             @PathVariable String orderPublicId,
             @PathVariable String itemPublicId) {
@@ -42,7 +42,7 @@ public class OrderController {
     }
 
     @PutMapping("/{orderPublicId}/items/{itemPublicId}")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER','EMPLOYEE')")
     public OrderResponse updateItemQuantity(
             @PathVariable String orderPublicId,
             @PathVariable String itemPublicId,
@@ -60,7 +60,7 @@ public class OrderController {
     }
 
     @PostMapping("/{orderPublicId}/close")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CASHIER','EMPLOYEE')")
     public OrderResponse closeOrder(
             @PathVariable String orderPublicId) {
 

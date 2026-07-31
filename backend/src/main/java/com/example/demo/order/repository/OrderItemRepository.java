@@ -71,7 +71,22 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
             @Param("tenantId") Long tenantId,
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end);
-            
+
+    @Query("""
+        SELECT oi.product.type,
+               SUM(oi.quantity), SUM(oi.subtotal)
+        FROM OrderItem oi
+        WHERE oi.order.tenant.id = :tenantId
+          AND oi.order.status = com.example.demo.common.enums.OrderStatus.CLOSED
+          AND oi.status = 'ACTIVE'
+          AND oi.order.createdAt BETWEEN :start AND :end
+        GROUP BY oi.product.type
+        ORDER BY SUM(oi.quantity) DESC
+    """)
+    List<Object[]> salesByProductType(
+            @Param("tenantId") Long tenantId,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
     List<OrderItem> findByActiveTrueAndSessionEndBeforeAndOrder_Tenant_Id(
             LocalDateTime now,
             Long tenantId);
