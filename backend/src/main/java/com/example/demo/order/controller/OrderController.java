@@ -5,6 +5,7 @@ import com.example.demo.order.service.OrderService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -73,5 +74,19 @@ public class OrderController {
             @PathVariable String orderPublicId) {
 
         return orderService.cancelOrder(orderPublicId);
+    }
+
+    @GetMapping("/history")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    public Page<OrderHistoryResponse> getOrderHistory(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String createdAtFrom,
+            @RequestParam(required = false) String createdAtTo) {
+
+        return orderService.getOrderHistory(page, size, search, status,
+                createdAtFrom, createdAtTo);
     }
 }

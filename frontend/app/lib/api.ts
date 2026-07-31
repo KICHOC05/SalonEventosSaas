@@ -583,6 +583,9 @@ export interface OrderResponse {
     tax: number;
     createdAt: string;
     closedAt: string | null;
+    sellerName?: string;
+    paymentMethods?: string[];
+    childNames?: string[];
     items: OrderItemResponse[];
 }
 
@@ -665,6 +668,62 @@ export async function getOrderTicket(orderPublicId: string): Promise<string> {
 
     if (!res.ok) throw new ApiError("Error al obtener ticket", res.status);
     return res.text();
+}
+
+// =====================================================
+// ORDER HISTORY (ADMIN / MANAGER)
+// =====================================================
+
+export interface OrderHistoryItem {
+    productName: string;
+    productType: string;
+    quantity: number;
+    unitPrice: number;
+    subtotal: number;
+    childName: string | null;
+    sessionStart: string | null;
+    sessionEnd: string | null;
+    durationMinutes: number | null;
+}
+
+export interface OrderHistoryRecord {
+    publicId: string;
+    shortCode: string;
+    createdAt: string;
+    closedAt: string | null;
+    customerName: string | null;
+    sellerName: string;
+    status: string;
+    totalAmount: number;
+    paymentMethods: string[];
+    childNames: string[];
+    itemsCount: number;
+    items?: OrderHistoryItem[];
+}
+
+export interface OrderHistoryParams {
+    page?: number;
+    size?: number;
+    search?: string;
+    status?: string;
+    createdAtFrom?: string;
+    createdAtTo?: string;
+}
+
+export async function fetchOrderHistory(
+    params: OrderHistoryParams = {}
+): Promise<PageResponse<OrderHistoryRecord>> {
+    const sp = new URLSearchParams();
+    if (params.page !== undefined) sp.set("page", String(params.page));
+    if (params.size !== undefined) sp.set("size", String(params.size));
+    if (params.search) sp.set("search", params.search);
+    if (params.status) sp.set("status", params.status);
+    if (params.createdAtFrom) sp.set("createdAtFrom", params.createdAtFrom);
+    if (params.createdAtTo) sp.set("createdAtTo", params.createdAtTo);
+
+    return apiFetch<PageResponse<OrderHistoryRecord>>(
+        `/orders/history?${sp.toString()}`
+    );
 }
 
 // =====================================================

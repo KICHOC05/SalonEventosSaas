@@ -5,11 +5,13 @@ import com.example.demo.common.enums.OrderStatus;
 import com.example.demo.common.enums.ProductType;
 import com.example.demo.common.enums.InventoryMode;
 import com.example.demo.common.enums.OrderItemStatus;
+import com.example.demo.common.enums.PaymentMethod;
 import com.example.demo.order.dto.*;
 import com.example.demo.order.model.Order;
 import com.example.demo.order.model.OrderItem;
 import com.example.demo.order.repository.OrderItemRepository;
 import com.example.demo.order.repository.OrderRepository;
+import com.example.demo.payment.model.Payment;
 import com.example.demo.payment.repository.PaymentRepository;
 import com.example.demo.product.model.Product;
 import com.example.demo.product.repository.ProductRepository;
@@ -26,6 +28,10 @@ import com.example.demo.user.repository.UserRepository;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -33,7 +39,9 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.List;
+import java.time.LocalTime;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -381,8 +389,10 @@ public class OrderService {
 
     private OrderResponse mapToResponse(Order order) {
 
-        List<OrderItemResponse> items = orderItemRepository
-                .findAllByOrder_Id(order.getId())
+        List<OrderItem> allItems = orderItemRepository
+                .findAllByOrder_Id(order.getId());
+
+        List<OrderItemResponse> items = allItems
                 .stream()
                 .map(item -> {
 
@@ -420,7 +430,110 @@ public class OrderService {
         response.setClosedAt(order.getClosedAt());
         response.setItems(items);
 
+        if (order.getUser() != null) {
+            response.setSellerName(order.getUser().getName());
+        }
+
+        List<Payment> payments = paymentRepository.findAllByOrder_Id(order.getId());
+        List<String> paymentMethods = payments.stream()
+                .map(Payment::getPaymentMethod)
+                .map(method -> switch (method) {
+                    case CASH -> "Efectivo";
+                    case CARD -> "Tarjeta";
+                    case TRANSFER -> "Transferencia";
+                })
+                .distinct()
+                .collect(Collectors.toList());
+        response.setPaymentMethods(paymentMethods);
+
+        Set<String> childNames = new LinkedHashSet<>();
+        for (OrderItem item : allItems) {
+            if (item.getStatus() == OrderItemStatus.ACTIVE
+                    && item.getChildName() != null && !item.getChildName().trim().isEmpty()) {
+                childNames.add(item.getChildName());
+            }
+        }
+        response.setChildNames(new ArrayList<>(childNames));
+
         return response;
+    }
+
+    @Transactional(readOnly = true)
+    public Page<OrderHistoryResponse> getOrderHistory(
+            int page, int size,
+            String search, String status,
+            String createdAtFrom, String createdAtTo) {
+
+        Long tenantId = TenantContext.getTenantId();
+
+        OrderStatus statusEnum = null;
+        if (status != null && !status.isBlank()) {
+            statusEnum = OrderStatus.valueOf(status);
+        }
+
+        LocalDateTime from = null;
+        if (createdAtFrom != null && !createdAtFrom.isBlank()) {
+            from = LocalDateTime.parse(createdAtFrom);
+        }
+
+        LocalDateTime to = null;
+        if (createdAtTo != null && !createdAtTo.isBlank()) {
+            to = LocalDateTime.parse(createdAtTo);
+        }
+
+        Pageable pageable = PageRequest.of(page, size);
+
+        Page<Order> orderPage = orderRepository.findHistoryByTenant(
+                tenantId, statusEnum, from, to, search, pageable);
+
+        return orderPage.map(this::mapToHistoryResponse);
+    }
+
+    private OrderHistoryResponse mapToHistoryResponse(Order order) {
+        OrderHistoryResponse r = new OrderHistoryResponse();
+
+        r.setPublicId(order.getPublicId());
+        r.setShortCode(order.getPublicId().length() > 8
+                ? order.getPublicId().substring(0, 8).toUpperCase()
+                : order.getPublicId().toUpperCase());
+        r.setCreatedAt(order.getCreatedAt());
+        r.setClosedAt(order.getClosedAt());
+        r.setCustomerName(order.getCustomerName());
+        r.setStatus(order.getStatus().name());
+        r.setTotalAmount(order.getTotalAmount());
+
+        if (order.getUser() != null) {
+            r.setSellerName(order.getUser().getName());
+        }
+
+        List<Payment> payments = paymentRepository.findAllByOrder_Id(order.getId());
+        List<String> paymentMethods = payments.stream()
+                .map(p -> p.getPaymentMethod())
+                .map(method -> switch (method) {
+                    case CASH -> "Efectivo";
+                    case CARD -> "Tarjeta";
+                    case TRANSFER -> "Transferencia";
+                })
+                .distinct()
+                .collect(Collectors.toList());
+        r.setPaymentMethods(paymentMethods);
+
+        List<OrderItem> allItems = orderItemRepository.findAllByOrder_Id(order.getId());
+        List<OrderItem> activeItems = allItems.stream()
+                .filter(i -> i.getStatus() == OrderItemStatus.ACTIVE)
+                .collect(Collectors.toList());
+
+        r.setItemsCount((long) activeItems.size());
+
+        Set<String> childNames = new LinkedHashSet<>();
+        for (OrderItem item : activeItems) {
+            if (item.getChildName() != null && !item.getChildName().trim().isEmpty()) {
+                childNames.add(item.getChildName());
+            }
+        }
+        r.setChildNames(new ArrayList<>(childNames));
+
+        return r;
     }
 
     public List<ActiveSessionResponse> getActiveSessions() {

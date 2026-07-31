@@ -1,0 +1,25 @@
+package com.example.demo.order.dto;
+
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Data
+public class OrderHistoryResponse {
+
+    private String publicId;
+    private String shortCode;
+    private LocalDateTime createdAt;
+    private LocalDateTime closedAt;
+    private String customerName;
+    private String sellerName;
+    private String status;
+    private BigDecimal totalAmount;
+    private List<String> paymentMethods;
+    private List<String> childNames;
+    private Long itemsCount;
+
+    private List<OrderHistoryItemResponse> items;
+}

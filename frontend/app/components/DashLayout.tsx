@@ -76,6 +76,7 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["ADMIN", "MANAGER", "CASHIER", "EMPLOYEE"],
     children: [
       { to: "/dashboard/pos/reportes", icon: FileText, label: "Reportes de venta", roles: ["ADMIN", "MANAGER"] },
+      { to: "/dashboard/pos/historial", icon: History, label: "Historial de órdenes", roles: ["ADMIN", "MANAGER"] },
     ],
   },
   {
@@ -108,6 +109,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/dashboard/inventario": "Inventario de Menús",
   "/dashboard/pos": "Punto de Venta",
   "/dashboard/pos/reportes": "Reportes de Venta",
+  "/dashboard/pos/historial": "Historial de Órdenes",
   "/dashboard/estadisticas": "Estadísticas de Ventas",
   "/dashboard/usuarios": "Gestión de Usuarios",
   "/dashboard/configuracion": "Configuración",

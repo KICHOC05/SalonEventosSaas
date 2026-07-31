@@ -28,6 +28,12 @@ public class OrderResponse {
 
     private LocalDateTime closedAt;
 
+    private String sellerName;
+
+    private List<String> paymentMethods;
+
+    private List<String> childNames;
+
     private List<OrderItemResponse> items;
 
 }
