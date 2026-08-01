@@ -21,5 +21,8 @@ public class OrderHistoryResponse {
     private List<String> childNames;
     private Long itemsCount;
 
+    private String clientPublicId;
+    private String clientParentName;
+
     private List<OrderHistoryItemResponse> items;
 }

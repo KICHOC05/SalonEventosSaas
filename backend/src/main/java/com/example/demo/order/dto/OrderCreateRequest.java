@@ -9,4 +9,6 @@ public class OrderCreateRequest {
 
     private String customerName;
 
+    private String clientPublicId;
+
 }

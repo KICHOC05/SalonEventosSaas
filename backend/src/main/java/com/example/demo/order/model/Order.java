@@ -1,6 +1,7 @@
 package com.example.demo.order.model;
 
 import com.example.demo.branch.model.Branch;
+import com.example.demo.client.model.Client;
 import com.example.demo.common.enums.OrderStatus;
 import com.example.demo.tenant.model.Tenant;
 import com.example.demo.user.model.User;
@@ -58,7 +59,10 @@ public class Order {
     private BigDecimal tax = BigDecimal.ZERO;
 
     private String customerName;
-   
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "client_id")
+    private Client client;
 
     private LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime closedAt;

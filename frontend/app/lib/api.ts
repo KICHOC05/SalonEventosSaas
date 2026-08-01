@@ -545,7 +545,7 @@ export type OrderStatus = "OPEN" | "CLOSED" | "CANCELLED" | "PARTIALLY_PAID";
 
 export interface OrderCreateRequest {
     customerName?: string;
-    childName?: string;
+    clientPublicId?: string;
 }
 
 export interface OrderItemRequest {
@@ -586,6 +586,8 @@ export interface OrderResponse {
     sellerName?: string;
     paymentMethods?: string[];
     childNames?: string[];
+    clientPublicId?: string;
+    clientParentName?: string;
     items: OrderItemResponse[];
 }
 
@@ -724,6 +726,61 @@ export async function fetchOrderHistory(
     return apiFetch<PageResponse<OrderHistoryRecord>>(
         `/orders/history?${sp.toString()}`
     );
+}
+
+// =====================================================
+// CLIENTS
+// =====================================================
+
+export interface ClientResponse {
+    publicId: string;
+    parentName: string;
+    childName: string;
+    phone: string;
+    email: string;
+    childBirthDate: string | null;
+    notes: string;
+    frequent: boolean;
+    status: string;
+    createdAt: string;
+}
+
+export interface ClientRequest {
+    parentName: string;
+    childName?: string;
+    phone?: string;
+    email?: string;
+    childBirthDate?: string;
+    notes?: string;
+    frequent?: boolean;
+}
+
+export async function searchClients(
+    search: string,
+    page = 0,
+    size = 10,
+    frequent?: boolean
+): Promise<PageResponse<ClientResponse>> {
+    const sp = new URLSearchParams();
+    sp.set("page", String(page));
+    sp.set("size", String(size));
+    if (search) sp.set("search", search);
+    if (frequent !== undefined) sp.set("frequent", String(frequent));
+
+    return apiFetch<PageResponse<ClientResponse>>(
+        `/clients?${sp.toString()}`
+    );
+}
+
+export async function createClient(data: ClientRequest): Promise<ClientResponse> {
+    return apiFetch<ClientResponse>("/clients", {
+        method: "POST",
+        body: JSON.stringify(data),
+    });
+}
+
+export async function getClientByPublicId(publicId: string): Promise<ClientResponse> {
+    return apiFetch<ClientResponse>(`/clients/${publicId}`);
 }
 
 // =====================================================

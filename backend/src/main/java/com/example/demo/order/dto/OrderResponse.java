@@ -34,6 +34,10 @@ public class OrderResponse {
 
     private List<String> childNames;
 
+    private String clientPublicId;
+
+    private String clientParentName;
+
     private List<OrderItemResponse> items;
 
 }

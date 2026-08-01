@@ -174,6 +174,21 @@ public class TicketService {
                                         .append("</span></div>");
                 }
 
+                if (order.getClient() != null) {
+                        if (hasText(order.getClient().getParentName())) {
+                                ticket.append("<div class='item-detail'>")
+                                        .append("Padre: ")
+                                        .append(escapeHtml(order.getClient().getParentName()))
+                                        .append("</div>");
+                        }
+                        if (hasText(order.getClient().getChildName())) {
+                                ticket.append("<div class='item-detail'>")
+                                        .append("Niño: ")
+                                        .append(escapeHtml(order.getClient().getChildName()))
+                                        .append("</div>");
+                        }
+                }
+
                 // CHILDREN SECTION - Before products
                 List<String> uniqueChildren = getUniqueChildren(activeItems);
                 if (!uniqueChildren.isEmpty()) {

@@ -53,6 +53,9 @@ import {
     type CashSettingsResponse,
     type PaymentResponse as PaymentRes,
     type PaymentMethod,
+    searchClients,
+    createClient,
+    type ClientResponse,
 } from "~/lib/api";
 import { buildMeta } from "~/lib/meta";
 import { useAuth } from "~/lib/auth";
@@ -370,6 +373,20 @@ export default function POS() {
     const [pendingProduct, setPendingProduct] = useState<ProductResponse | null>(null);
     const [serviceChildName, setServiceChildName] = useState("");
 
+    const [showClientModal, setShowClientModal] = useState(false);
+    const [clientMode, setClientMode] = useState<"regular" | "frequent">("regular");
+    const [clientParentName, setClientParentName] = useState("");
+    const [clientChildNameInput, setClientChildNameInput] = useState("");
+    const [clientSearchQuery, setClientSearchQuery] = useState("");
+    const [clientSearchResults, setClientSearchResults] = useState<ClientResponse[]>([]);
+    const [clientSearching, setClientSearching] = useState(false);
+    const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+    const [showCreateClientForm, setShowCreateClientForm] = useState(false);
+    const [createClientLoading, setCreateClientLoading] = useState(false);
+    const [createFreqParentName, setCreateFreqParentName] = useState("");
+    const [createFreqChildName, setCreateFreqChildName] = useState("");
+    const [createFreqPhone, setCreateFreqPhone] = useState("");
+
     const currentTab = orderTabs.find((t) => t.id === activeOrderTabId);
     const order = currentTab?.order ?? null;
     const customerName = currentTab?.customerName ?? "";
@@ -590,12 +607,19 @@ export default function POS() {
     }
 
     // Nueva función para agregar servicio con nombre de niño
-    async function handleAddServiceProduct() {
+    async function handleAddServiceWithClient() {
         if (!pendingProduct) return;
 
-        if (!serviceChildName.trim()) {
-            showToast("warning", "Ingresa el nombre del niño");
-            return;
+        if (clientMode === "regular") {
+            if (!clientParentName.trim()) {
+                showToast("warning", "Ingresa el nombre del cliente");
+                return;
+            }
+        } else {
+            if (!selectedClientId) {
+                showToast("warning", "Selecciona un cliente frecuente");
+                return;
+            }
         }
 
         if (addingProductId) return;
@@ -604,23 +628,30 @@ export default function POS() {
         try {
             let currentOrder = order;
             if (!currentOrder) {
-                if (!customerName.trim()) {
-                    showToast("warning", "Debes capturar el nombre del padre antes de agregar una hora de juego");
-                    setAddingProductId(null);
-                    return;
-                }
                 setOrderLoading(true);
-                currentOrder = await createOrder({
-                    customerName: customerName || undefined,
-                });
+                const createReq: any = {};
+                if (clientMode === "regular") {
+                    createReq.customerName = clientParentName.trim();
+                } else if (selectedClientId) {
+                    createReq.clientPublicId = selectedClientId;
+                }
+                currentOrder = await createOrder(createReq);
                 setOrder(currentOrder);
-                updateCurrentTab({ order: currentOrder, label: customerName || "Orden" });
+                updateCurrentTab({
+                    order: currentOrder,
+                    customerName: currentOrder.customerName || clientParentName || "Orden",
+                    label: currentOrder.customerName || clientParentName || "Orden",
+                });
             }
+
+            const childName = clientMode === "regular"
+                ? (clientChildNameInput.trim() || undefined)
+                : clientSearchResults.find(c => c.publicId === selectedClientId)?.childName || undefined;
 
             const updatedOrder = await addOrderItem(currentOrder.publicId, {
                 productPublicId: pendingProduct.publicId,
                 quantity: 1,
-                childName: serviceChildName.trim(),
+                childName,
             });
 
             setOrder(updatedOrder);
@@ -638,17 +669,67 @@ export default function POS() {
             if (warnings && warnings.length > 0) {
                 showToast("warning", warnings[0].warning!);
             } else {
-                showToast("success", `Hora agregada para ${serviceChildName.trim()}`);
+                showToast("success", `Servicio agregado`);
             }
 
-            setShowServiceModal(false);
+            setShowClientModal(false);
             setPendingProduct(null);
-            setServiceChildName("");
+            resetClientForm();
         } catch (e: any) {
             showToast("error", e.message || "Error al agregar servicio");
         } finally {
             setOrderLoading(false);
             setTimeout(() => setAddingProductId(null), 600);
+        }
+    }
+
+    function resetClientForm() {
+        setClientMode("regular");
+        setClientParentName("");
+        setClientChildNameInput("");
+        setClientSearchQuery("");
+        setClientSearchResults([]);
+        setSelectedClientId(null);
+        setShowCreateClientForm(false);
+    }
+
+    async function handleClientSearch() {
+        if (!clientSearchQuery.trim()) return;
+        setClientSearching(true);
+        try {
+            const result = await searchClients(clientSearchQuery, 0, 10);
+            setClientSearchResults(result.content);
+        } catch {
+            setClientSearchResults([]);
+        } finally {
+            setClientSearching(false);
+        }
+    }
+
+    async function handleCreateFrequentClient() {
+        if (!createFreqParentName.trim()) {
+            showToast("warning", "Ingresa el nombre del padre");
+            return;
+        }
+        setCreateClientLoading(true);
+        try {
+            const created = await createClient({
+                parentName: createFreqParentName.trim(),
+                childName: createFreqChildName.trim() || undefined,
+                phone: createFreqPhone.trim() || undefined,
+                frequent: true,
+            });
+            setSelectedClientId(created.publicId);
+            setClientSearchResults([created]);
+            setShowCreateClientForm(false);
+            setCreateFreqParentName("");
+            setCreateFreqChildName("");
+            setCreateFreqPhone("");
+            showToast("success", "Cliente frecuente creado");
+        } catch (e: any) {
+            showToast("error", e.message || "Error al crear cliente");
+        } finally {
+            setCreateClientLoading(false);
         }
     }
 
@@ -660,14 +741,15 @@ export default function POS() {
 
         // REGLA: Para servicios, abrir modal
         if (product.type === "SERVICE") {
-            // Regla 1: Validar nombre del padre si no hay orden
-            if (!order && !customerName.trim()) {
-                showToast("warning", "Debes capturar el nombre del padre antes de agregar una hora de juego");
-                return;
-            }
             setPendingProduct(product);
-            setServiceChildName("");
-            setShowServiceModal(true);
+            setClientMode("regular");
+            setClientParentName(customerName || "");
+            setClientChildNameInput("");
+            setClientSearchQuery("");
+            setClientSearchResults([]);
+            setSelectedClientId(null);
+            setShowCreateClientForm(false);
+            setShowClientModal(true);
             return;
         }
 
@@ -1138,26 +1220,29 @@ export default function POS() {
                             </div>
 
                             {!order && (
-                                <div className="space-y-2 mt-2 mb-3">
-                                    <div className="relative">
-                                        <User className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/30" />
-                                        <input
-                                            type="text"
-                                            placeholder="Nombre del padre / cliente"
-                                            className="input input-bordered input-sm w-full pl-9 rounded-lg"
-                                            value={customerName}
-                                            onChange={(e) => setCustomerName(e.target.value)}
-                                        />
-                                    </div>
+                                <div className="flex flex-col items-center justify-center py-4 text-base-content/20 gap-2">
+                                    <User className="w-6 h-6" />
+                                    <p className="text-[10px] font-medium text-center">
+                                        Agrega un servicio (Hora de Juego) para registrar el cliente
+                                    </p>
                                 </div>
                             )}
 
-                            {order && order.customerName && (
-                                <div className="flex items-center gap-3 p-2.5 bg-base-200/50 rounded-xl mt-1 mb-2">
-                                    <span className="text-xs flex items-center gap-1 text-base-content/60">
-                                        <User className="w-3 h-3" />
-                                        {order.customerName}
-                                    </span>
+                            {order && (order.customerName || order.clientParentName) && (
+                                <div className="space-y-2 mb-2">
+                                    <div className="flex items-center gap-3 p-2.5 bg-base-200/50 rounded-xl">
+                                        <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                            <User className="w-3.5 h-3.5 text-primary" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-medium truncate">
+                                                {order.clientParentName || order.customerName || "Sin nombre"}
+                                            </p>
+                                            {order.clientPublicId && (
+                                                <p className="text-[10px] text-primary/60">Cliente frecuente</p>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
@@ -1361,65 +1446,231 @@ export default function POS() {
                 </div>
             </div>
 
-            {/* Modal para capturar nombre del niño en servicios */}
+            {/* Modal del cliente para servicios */}
             <Modal
-                open={showServiceModal}
+                open={showClientModal}
                 onClose={() => {
-                    setShowServiceModal(false);
+                    setShowClientModal(false);
                     setPendingProduct(null);
-                    setServiceChildName("");
+                    resetClientForm();
                 }}
-                maxWidth="max-w-sm"
+                maxWidth="max-w-lg"
             >
                 <ModalHeader
-                    icon={Baby}
+                    icon={User}
                     iconColor="bg-primary/10 text-primary"
-                    title="Hora de Juego"
-                    subtitle="Captura el nombre del niño"
+                    title="Asignar cliente al servicio"
+                    subtitle="Registra un cliente rápido o selecciona un cliente frecuente"
                     onClose={() => {
-                        setShowServiceModal(false);
+                        setShowClientModal(false);
                         setPendingProduct(null);
-                        setServiceChildName("");
+                        resetClientForm();
                     }}
                 />
-                <div className="p-5 pt-4 space-y-4">
-                    <fieldset className="fieldset">
-                        <legend className="fieldset-legend text-xs flex items-center gap-1">
-                            <Baby className="w-3 h-3" /> Nombre del niño
-                        </legend>
-                        <input
-                            type="text"
-                            placeholder="Ej: Luis, Sofía, Mateo..."
-                            className="input input-bordered w-full"
-                            value={serviceChildName}
-                            onChange={(e) => setServiceChildName(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleAddServiceProduct()}
-                            autoFocus
-                        />
-                    </fieldset>
+                <div className="p-5 pt-3 space-y-4">
+                    <div className="flex gap-1 bg-base-200/50 rounded-xl p-1 border border-base-300/30">
+                        <button
+                            className={`btn btn-sm rounded-lg flex-1 ${clientMode === "regular" ? "btn-primary shadow-md" : "btn-ghost text-base-content/50"}`}
+                            onClick={() => setClientMode("regular")}
+                        >
+                            Cliente regular
+                        </button>
+                        <button
+                            className={`btn btn-sm rounded-lg flex-1 ${clientMode === "frequent" ? "btn-primary shadow-md" : "btn-ghost text-base-content/50"}`}
+                            onClick={() => setClientMode("frequent")}
+                        >
+                            Cliente frecuente
+                        </button>
+                    </div>
 
-                    <div className="flex gap-2">
+                    {clientMode === "regular" && (
+                        <div className="space-y-3">
+                            <fieldset className="fieldset">
+                                <legend className="fieldset-legend text-xs flex items-center gap-1">
+                                    <User className="w-3 h-3" /> Nombre del padre / cliente
+                                </legend>
+                                <input
+                                    type="text"
+                                    placeholder="Ej: Luis Hernández"
+                                    className="input input-bordered w-full"
+                                    value={clientParentName}
+                                    onChange={(e) => setClientParentName(e.target.value)}
+                                    autoFocus
+                                />
+                            </fieldset>
+                            <fieldset className="fieldset">
+                                <legend className="fieldset-legend text-xs flex items-center gap-1">
+                                    <Baby className="w-3 h-3" /> Nombre del niño <span className="text-base-content/30">(opcional)</span>
+                                </legend>
+                                <input
+                                    type="text"
+                                    placeholder="Ej: Emilio"
+                                    className="input input-bordered w-full"
+                                    value={clientChildNameInput}
+                                    onChange={(e) => setClientChildNameInput(e.target.value)}
+                                />
+                            </fieldset>
+                        </div>
+                    )}
+
+                    {clientMode === "frequent" && !showCreateClientForm && (
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1">
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar por nombre, niño, teléfono..."
+                                        className="input input-bordered input-sm w-full"
+                                        value={clientSearchQuery}
+                                        onChange={(e) => setClientSearchQuery(e.target.value)}
+                                        onKeyDown={(e) => e.key === "Enter" && handleClientSearch()}
+                                        autoFocus
+                                    />
+                                </div>
+                                <button
+                                    className="btn btn-primary btn-sm gap-1"
+                                    onClick={handleClientSearch}
+                                    disabled={clientSearching}
+                                >
+                                    {clientSearching ? (
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                        <Search className="w-3.5 h-3.5" />
+                                    )}
+                                    Buscar
+                                </button>
+                            </div>
+
+                            {clientSearchResults.length > 0 && (
+                                <div className="space-y-1 max-h-56 overflow-y-auto">
+                                    {clientSearchResults.map((c) => (
+                                        <div
+                                            key={c.publicId}
+                                            className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
+                                                selectedClientId === c.publicId
+                                                    ? "bg-primary/10 border-primary/30"
+                                                    : "bg-base-200/50 border-base-300/30 hover:bg-base-200"
+                                            }`}
+                                            onClick={() => setSelectedClientId(c.publicId)}
+                                        >
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium truncate">{c.parentName}</p>
+                                                {c.childName && (
+                                                    <p className="text-xs text-base-content/40 flex items-center gap-1">
+                                                        <Baby className="w-3 h-3" />
+                                                        {c.childName}
+                                                    </p>
+                                                )}
+                                                {c.phone && (
+                                                    <p className="text-[10px] text-base-content/30">{c.phone}</p>
+                                                )}
+                                            </div>
+                                            <button
+                                                className={`btn btn-xs rounded-lg ${
+                                                    selectedClientId === c.publicId
+                                                        ? "btn-primary"
+                                                        : "btn-ghost"
+                                                }`}
+                                            >
+                                                {selectedClientId === c.publicId ? "Seleccionado" : "Seleccionar"}
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <button
+                                className="btn btn-ghost btn-sm w-full gap-1"
+                                onClick={() => setShowCreateClientForm(true)}
+                            >
+                                <Plus className="w-3.5 h-3.5" />
+                                Crear nuevo cliente frecuente
+                            </button>
+                        </div>
+                    )}
+
+                    {clientMode === "frequent" && showCreateClientForm && (
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                                <button
+                                    className="btn btn-ghost btn-sm gap-1"
+                                    onClick={() => setShowCreateClientForm(false)}
+                                >
+                                    <ChevronRight className="w-3.5 h-3.5 rotate-180" />
+                                    Volver
+                                </button>
+                                <span className="text-sm font-medium">Nuevo cliente frecuente</span>
+                            </div>
+                            <fieldset className="fieldset">
+                                <legend className="fieldset-legend text-xs">Nombre del padre *</legend>
+                                <input
+                                    type="text"
+                                    placeholder="Ej: Luis Hernández"
+                                    className="input input-bordered input-sm w-full"
+                                    value={createFreqParentName}
+                                    onChange={(e) => setCreateFreqParentName(e.target.value)}
+                                />
+                            </fieldset>
+                            <fieldset className="fieldset">
+                                <legend className="fieldset-legend text-xs">Nombre del niño</legend>
+                                <input
+                                    type="text"
+                                    placeholder="Ej: Emilio"
+                                    className="input input-bordered input-sm w-full"
+                                    value={createFreqChildName}
+                                    onChange={(e) => setCreateFreqChildName(e.target.value)}
+                                />
+                            </fieldset>
+                            <fieldset className="fieldset">
+                                <legend className="fieldset-legend text-xs">Teléfono</legend>
+                                <input
+                                    type="text"
+                                    placeholder="7711234567"
+                                    className="input input-bordered input-sm w-full"
+                                    value={createFreqPhone}
+                                    onChange={(e) => setCreateFreqPhone(e.target.value)}
+                                />
+                            </fieldset>
+                            <button
+                                className="btn btn-primary btn-sm w-full gap-2"
+                                onClick={handleCreateFrequentClient}
+                                disabled={createClientLoading}
+                            >
+                                {createClientLoading ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <Plus className="w-4 h-4" />
+                                )}
+                                Crear cliente frecuente
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="flex gap-2 pt-1">
                         <button
                             className="btn btn-ghost flex-1"
                             onClick={() => {
-                                setShowServiceModal(false);
+                                setShowClientModal(false);
                                 setPendingProduct(null);
-                                setServiceChildName("");
+                                resetClientForm();
                             }}
                         >
                             Cancelar
                         </button>
                         <button
                             className="btn btn-primary flex-1 gap-2 shadow-md shadow-primary/20"
-                            onClick={handleAddServiceProduct}
-                            disabled={addingProductId === pendingProduct?.publicId}
+                            onClick={handleAddServiceWithClient}
+                            disabled={
+                                addingProductId === pendingProduct?.publicId ||
+                                (clientMode === "frequent" && !selectedClientId)
+                            }
                         >
                             {addingProductId === pendingProduct?.publicId ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
-                                <Plus className="w-4 h-4" />
+                                <Check className="w-4 h-4" />
                             )}
-                            Agregar Servicio
+                            Agregar servicio
                         </button>
                     </div>
                 </div>

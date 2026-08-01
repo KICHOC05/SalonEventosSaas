@@ -1,5 +1,7 @@
 package com.example.demo.order.service;
 
+import com.example.demo.client.model.Client;
+import com.example.demo.client.repository.ClientRepository;
 import com.example.demo.security.TenantContext;
 import com.example.demo.common.enums.OrderStatus;
 import com.example.demo.common.enums.ProductType;
@@ -56,6 +58,7 @@ public class OrderService {
     private final UserRepository userRepository;
 
     private final PaymentRepository paymentRepository;
+    private final ClientRepository clientRepository;
     private final TaxSettingsRepository taxSettingsRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
 
@@ -81,6 +84,16 @@ public class OrderService {
         order.setUser(user);
 
         order.setCustomerName(request.getCustomerName());
+
+        if (request.getClientPublicId() != null && !request.getClientPublicId().isBlank()) {
+            Client client = clientRepository
+                    .findByPublicIdAndTenant_Id(request.getClientPublicId(), tenantId)
+                    .orElseThrow(() -> new EntityNotFoundException("Client not found"));
+            order.setClient(client);
+            if (order.getCustomerName() == null || order.getCustomerName().isBlank()) {
+                order.setCustomerName(client.getParentName());
+            }
+        }
 
         order.setStatus(OrderStatus.OPEN);
         order.setSubtotal(BigDecimal.ZERO);
@@ -455,6 +468,11 @@ public class OrderService {
         }
         response.setChildNames(new ArrayList<>(childNames));
 
+        if (order.getClient() != null) {
+            response.setClientPublicId(order.getClient().getPublicId());
+            response.setClientParentName(order.getClient().getParentName());
+        }
+
         return response;
     }
 
@@ -501,6 +519,14 @@ public class OrderService {
         r.setCustomerName(order.getCustomerName());
         r.setStatus(order.getStatus().name());
         r.setTotalAmount(order.getTotalAmount());
+
+        if (order.getClient() != null) {
+            r.setClientPublicId(order.getClient().getPublicId());
+            r.setClientParentName(order.getClient().getParentName());
+            if (r.getCustomerName() == null || r.getCustomerName().isBlank()) {
+                r.setCustomerName(order.getClient().getParentName());
+            }
+        }
 
         if (order.getUser() != null) {
             r.setSellerName(order.getUser().getName());
