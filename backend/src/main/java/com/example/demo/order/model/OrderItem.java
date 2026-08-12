@@ -74,4 +74,7 @@ private String childName;
 
     @Column(nullable = false)
     private Boolean isEvent = false;
+
+    @Column(name = "reward_item", nullable = false)
+    private Boolean rewardItem = false;
 }

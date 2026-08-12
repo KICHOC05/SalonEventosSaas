@@ -217,6 +217,12 @@ public class TicketService {
                                         .append("</span>");
                         ticket.append("</div>");
 
+                        if (Boolean.TRUE.equals(item.getRewardItem())) {
+                                ticket.append("<div class='item-detail' style='color:#10b981;'>")
+                                                .append("Recompensa lealtad")
+                                                .append("</div>");
+                        }
+
                         // Show child name for SERVICE type
                         if (item.getProduct().getType() == ProductType.SERVICE && hasText(item.getChildName())) {
                                 ticket.append("<div class='item-detail'>")

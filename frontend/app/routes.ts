@@ -18,6 +18,7 @@ export default [
         route("dashboard/pos", "routes/dashboard/pos.tsx"),
         route("dashboard/pos/reportes", "routes/dashboard/pos/reportes.tsx"),
         route("dashboard/pos/historial", "routes/dashboard/pos/historial.tsx"),
+        route("dashboard/pos/lealtad", "routes/dashboard/pos/lealtad.tsx"),
         route("dashboard/estadisticas", "routes/dashboard/estadisticas.tsx"),
         route("dashboard/usuarios", "routes/dashboard/usuarios.tsx"),
         route("dashboard/configuracion", "routes/dashboard/configuracion.tsx"),

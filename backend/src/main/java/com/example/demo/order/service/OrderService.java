@@ -2,6 +2,7 @@ package com.example.demo.order.service;
 
 import com.example.demo.client.model.Client;
 import com.example.demo.client.repository.ClientRepository;
+import com.example.demo.loyalty.service.LoyaltyService;
 import com.example.demo.security.TenantContext;
 import com.example.demo.common.enums.OrderStatus;
 import com.example.demo.common.enums.ProductType;
@@ -30,6 +31,7 @@ import com.example.demo.user.repository.UserRepository;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -45,6 +47,7 @@ import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderService {
@@ -59,6 +62,7 @@ public class OrderService {
 
     private final PaymentRepository paymentRepository;
     private final ClientRepository clientRepository;
+    private final LoyaltyService loyaltyService;
     private final TaxSettingsRepository taxSettingsRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
 
@@ -291,13 +295,18 @@ public class OrderService {
         return getOrder(orderPublicId);
     }
 
+    @Transactional
     public OrderResponse closeOrder(String publicId) {
 
         Long tenantId = TenantContext.getTenantId();
 
         Order order = getOrderEntity(publicId, tenantId);
+        log.info("closeOrder called for order={} status={} hasClient={} totalAmount={}",
+                order.getPublicId(), order.getStatus(),
+                order.getClient() != null, order.getTotalAmount());
 
         if (order.getStatus() == OrderStatus.CLOSED) {
+            log.info("closeOrder SKIP: order {} already CLOSED", order.getPublicId());
             return mapToResponse(order);
         }
 
@@ -317,6 +326,14 @@ public class OrderService {
         order.setClosedAt(LocalDateTime.now());
 
         orderRepository.save(order);
+
+        log.info("closeOrder: order {} closed, registering loyalty visits...", order.getPublicId());
+
+        try {
+            loyaltyService.registerVisits(order);
+        } catch (Exception e) {
+            log.warn("Error registering loyalty visits for order {}: {}", order.getPublicId(), e.getMessage(), e);
+        }
 
         return mapToResponse(order);
     }

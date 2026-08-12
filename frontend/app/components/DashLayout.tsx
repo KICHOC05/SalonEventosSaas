@@ -18,6 +18,7 @@ import {
   Clock,
   History,
   FileText,
+  Gift,
 } from "lucide-react";
 import { useAuth } from "~/lib/auth";
 import { useNotifications } from "~/context/NotificationContext";
@@ -77,6 +78,7 @@ const NAV_ITEMS: NavItem[] = [
     children: [
       { to: "/dashboard/pos/reportes", icon: FileText, label: "Reportes de venta", roles: ["ADMIN", "MANAGER"] },
       { to: "/dashboard/pos/historial", icon: History, label: "Historial de órdenes", roles: ["ADMIN", "MANAGER"] },
+      { to: "/dashboard/pos/lealtad", icon: Gift, label: "Programa de lealtad", roles: ["ADMIN"] },
     ],
   },
   {
@@ -110,6 +112,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/dashboard/pos": "Punto de Venta",
   "/dashboard/pos/reportes": "Reportes de Venta",
   "/dashboard/pos/historial": "Historial de Órdenes",
+  "/dashboard/pos/lealtad": "Programa de Lealtad",
   "/dashboard/estadisticas": "Estadísticas de Ventas",
   "/dashboard/usuarios": "Gestión de Usuarios",
   "/dashboard/configuracion": "Configuración",

@@ -102,8 +102,6 @@ public class PaymentService {
         payment.setPaymentMethod(request.getPaymentMethod());
         payment.setReference(request.getReference());
 
-paymentRepository.save(payment);
-
         paymentRepository.save(payment);
 
         BigDecimal totalPaidAfter = totalPaidBefore.add(amountToApply);

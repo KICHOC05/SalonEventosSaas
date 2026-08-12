@@ -16,6 +16,8 @@ import {
     Vault,
     Loader2,
     ArrowRightLeft,
+    ArrowDown,
+    ArrowUp,
     Sparkles,
     Package,
     Zap,
@@ -23,6 +25,8 @@ import {
     Baby,
     Hash,
     ChevronRight,
+    ChevronDown,
+    ChevronUp,
     CircleDollarSign,
     Banknote,
     CheckCircle2,
@@ -30,6 +34,7 @@ import {
     Calculator,
     Clock,
     Building,
+    Gift,
 } from "lucide-react";
 import {
     fetchProducts,
@@ -45,6 +50,8 @@ import {
     closeCashRegister,
     getCashSettings,
     updateCashOpeningAmount,
+    createCashWithdrawal,
+    createCashDeposit,
     getOrderTicket,
     type ProductResponse,
     type OrderResponse,
@@ -53,9 +60,13 @@ import {
     type CashSettingsResponse,
     type PaymentResponse as PaymentRes,
     type PaymentMethod,
+    type CashMovementRequest,
     searchClients,
     createClient,
     type ClientResponse,
+    fetchClientLoyalty,
+    redeemLoyaltyReward,
+    type ClientLoyaltyResponse,
 } from "~/lib/api";
 import { buildMeta } from "~/lib/meta";
 import { useAuth } from "~/lib/auth";
@@ -357,6 +368,16 @@ export default function POS() {
     const [settingsAmount, setSettingsAmount] = useState("");
     const [settingsSaving, setSettingsSaving] = useState(false);
 
+    const [showWithdrawal, setShowWithdrawal] = useState(false);
+    const [showDeposit, setShowDeposit] = useState(false);
+    const [movementAmount, setMovementAmount] = useState("");
+    const [movementReason, setMovementReason] = useState("");
+    const [movementNotes, setMovementNotes] = useState("");
+    const [processingMovement, setProcessingMovement] = useState(false);
+
+    const [showCashDetail, setShowCashDetail] = useState(false);
+    const [showSalesDetail, setShowSalesDetail] = useState(false);
+
     const { isAdmin, isManager } = useAuth();
     const canConfigureCash = isAdmin || isManager;
 
@@ -386,6 +407,10 @@ export default function POS() {
     const [createFreqParentName, setCreateFreqParentName] = useState("");
     const [createFreqChildName, setCreateFreqChildName] = useState("");
     const [createFreqPhone, setCreateFreqPhone] = useState("");
+
+    const [clientLoyalty, setClientLoyalty] = useState<ClientLoyaltyResponse | null>(null);
+    const [useReward, setUseReward] = useState(false);
+    const [loyaltyLoading, setLoyaltyLoading] = useState(false);
 
     const currentTab = orderTabs.find((t) => t.id === activeOrderTabId);
     const order = currentTab?.order ?? null;
@@ -606,6 +631,66 @@ export default function POS() {
         }
     }
 
+    async function refreshCash() {
+        try {
+            const c = await getCurrentCash();
+            setCash(c);
+        } catch {
+            // silent
+        }
+    }
+
+    async function handleMovement(action: "withdraw" | "deposit") {
+        const amount = parseFloat(movementAmount);
+        if (isNaN(amount) || amount <= 0) {
+            showToast("error", "Monto inválido. Debe ser mayor a 0.");
+            return;
+        }
+        if (!movementReason.trim()) {
+            showToast("error", "El motivo es obligatorio.");
+            return;
+        }
+
+        setProcessingMovement(true);
+        try {
+            const data: CashMovementRequest = {
+                amount,
+                reason: movementReason.trim(),
+                notes: movementNotes.trim() || undefined,
+            };
+
+            if (action === "withdraw") {
+                await createCashWithdrawal(data);
+                setShowWithdrawal(false);
+                showToast("success", "Retiro registrado correctamente");
+            } else {
+                await createCashDeposit(data);
+                setShowDeposit(false);
+                showToast("success", "Depósito registrado correctamente");
+            }
+
+            setMovementAmount("");
+            setMovementReason("");
+            setMovementNotes("");
+            await refreshCash();
+        } catch (e: any) {
+            showToast("error", e.message || "Error al registrar movimiento");
+        } finally {
+            setProcessingMovement(false);
+        }
+    }
+
+    function openMovementModal(type: "withdraw" | "deposit") {
+        setMovementAmount("");
+        setMovementReason("");
+        setMovementNotes("");
+        if (type === "withdraw") {
+            setShowWithdrawal(true);
+        } else {
+            setShowDeposit(true);
+        }
+    }
+
     // Nueva función para agregar servicio con nombre de niño
     async function handleAddServiceWithClient() {
         if (!pendingProduct) return;
@@ -648,11 +733,20 @@ export default function POS() {
                 ? (clientChildNameInput.trim() || undefined)
                 : clientSearchResults.find(c => c.publicId === selectedClientId)?.childName || undefined;
 
-            const updatedOrder = await addOrderItem(currentOrder.publicId, {
-                productPublicId: pendingProduct.publicId,
-                quantity: 1,
-                childName,
-            });
+            let updatedOrder: OrderResponse;
+
+            const shouldRedeem = clientMode === "frequent" && useReward && selectedClientId
+                && (clientSearchResults.find(c => c.publicId === selectedClientId)?.rewardsAvailable ?? 0) > 0;
+
+            if (shouldRedeem) {
+                updatedOrder = await redeemLoyaltyReward(currentOrder.publicId, selectedClientId!);
+            } else {
+                updatedOrder = await addOrderItem(currentOrder.publicId, {
+                    productPublicId: pendingProduct.publicId,
+                    quantity: 1,
+                    childName,
+                });
+            }
 
             setOrder(updatedOrder);
             setProducts((prev) =>
@@ -691,6 +785,8 @@ export default function POS() {
         setClientSearchResults([]);
         setSelectedClientId(null);
         setShowCreateClientForm(false);
+        setClientLoyalty(null);
+        setUseReward(false);
     }
 
     async function handleClientSearch() {
@@ -725,11 +821,25 @@ export default function POS() {
             setCreateFreqParentName("");
             setCreateFreqChildName("");
             setCreateFreqPhone("");
+            loadClientLoyalty(created.publicId);
             showToast("success", "Cliente frecuente creado");
         } catch (e: any) {
             showToast("error", e.message || "Error al crear cliente");
         } finally {
             setCreateClientLoading(false);
+        }
+    }
+
+    async function loadClientLoyalty(clientPublicId: string) {
+        setLoyaltyLoading(true);
+        try {
+            const loyalty = await fetchClientLoyalty(clientPublicId);
+            setClientLoyalty(loyalty);
+            setUseReward(false);
+        } catch {
+            setClientLoyalty(null);
+        } finally {
+            setLoyaltyLoading(false);
         }
     }
 
@@ -1001,9 +1111,27 @@ export default function POS() {
                                 <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
                                 <Vault className="w-4 h-4 text-success" />
                                 <span className="text-sm font-semibold text-success">
-                                    Caja abierta · {formatMoney(cash.openingAmount ?? 0)}
+                                    Caja abierta · {formatMoney(cash.expectedCash ?? 0)}
                                 </span>
                             </div>
+                            {canConfigureCash && (
+                                <>
+                                    <button
+                                        className="btn btn-sm btn-outline btn-success rounded-xl gap-1.5"
+                                        onClick={() => openMovementModal("deposit")}
+                                    >
+                                        <ArrowDown className="w-3.5 h-3.5" />
+                                        Agregar efectivo
+                                    </button>
+                                    <button
+                                        className="btn btn-sm btn-outline btn-error rounded-xl gap-1.5"
+                                        onClick={() => openMovementModal("withdraw")}
+                                    >
+                                        <ArrowUp className="w-3.5 h-3.5" />
+                                        Retirar efectivo
+                                    </button>
+                                </>
+                            )}
                             <button
                                 className="btn btn-sm btn-outline rounded-xl gap-1.5"
                                 onClick={handleShowCloseCash}
@@ -1037,6 +1165,81 @@ export default function POS() {
                     <button className="btn btn-warning btn-sm" onClick={() => setShowOpenCash(true)}>
                         Abrir caja
                     </button>
+                </div>
+            )}
+
+            {cashOpen && cash && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="bg-base-100 border border-success/20 rounded-2xl shadow-sm overflow-hidden">
+                        <button
+                            className="w-full flex items-center justify-between p-4 hover:bg-success/5 transition-colors"
+                            onClick={() => setShowCashDetail(!showCashDetail)}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
+                                    <Banknote className="w-4 h-4 text-success" />
+                                </div>
+                                <div className="text-left">
+                                    <p className="text-xs text-base-content/40">Efectivo en caja</p>
+                                    <p className="text-sm font-bold text-success">{formatMoney(cash.expectedCash ?? 0)}</p>
+                                </div>
+                            </div>
+                            {showCashDetail ? (
+                                <ChevronUp className="w-4 h-4 text-base-content/30" />
+                            ) : (
+                                <ChevronDown className="w-4 h-4 text-base-content/30" />
+                            )}
+                        </button>
+                        {showCashDetail && (
+                            <div className="px-4 pb-4 space-y-2 border-t border-success/10 pt-3">
+                                <CashSummaryRow label="Monto apertura" value={cash.openingAmount ?? 0} emoji="🏦" />
+                                <CashSummaryRow label="Ventas en efectivo" value={cash.cashSales ?? 0} emoji="💵" color="text-success" />
+                                {(cash.depositTotal ?? 0) > 0 && (
+                                    <CashSummaryRow label="Depósitos" value={cash.depositTotal ?? 0} emoji="📥" color="text-success" />
+                                )}
+                                {(cash.withdrawalTotal ?? 0) > 0 && (
+                                    <CashSummaryRow label="Retiros" value={cash.withdrawalTotal ?? 0} emoji="📤" color="text-error" />
+                                )}
+                                <div className="border-t border-base-300/40 pt-2 mt-2">
+                                    <CashSummaryRow label="Efectivo esperado" value={cash.expectedCash ?? 0} bold color="text-success" />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    <div className="bg-base-100 border border-base-300/30 rounded-2xl shadow-sm overflow-hidden">
+                        <button
+                            className="w-full flex items-center justify-between p-4 hover:bg-primary/5 transition-colors"
+                            onClick={() => setShowSalesDetail(!showSalesDetail)}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                                    <Receipt className="w-4 h-4 text-primary" />
+                                </div>
+                                <div className="text-left">
+                                    <p className="text-xs text-base-content/40">Ventas del día</p>
+                                    <p className="text-sm font-bold text-primary">{formatMoney(cash.salesTotal ?? 0)}</p>
+                                </div>
+                            </div>
+                            {showSalesDetail ? (
+                                <ChevronUp className="w-4 h-4 text-base-content/30" />
+                            ) : (
+                                <ChevronDown className="w-4 h-4 text-base-content/30" />
+                            )}
+                        </button>
+                        {showSalesDetail && (
+                            <div className="px-4 pb-4 space-y-2 border-t border-base-300/30 pt-3">
+                                <CashSummaryRow label="Efectivo" value={cash.cashSales ?? 0} emoji="💵" />
+                                <CashSummaryRow label="Tarjeta" value={cash.cardSales ?? 0} emoji="💳" />
+                                <CashSummaryRow label="Transferencia" value={cash.transferSales ?? 0} emoji="🏦" />
+                                <div className="border-t border-base-300/40 pt-2 mt-2">
+                                    <CashSummaryRow label="Total ventas" value={cash.salesTotal ?? 0} bold />
+                                </div>
+                                <p className="text-[10px] text-base-content/30 pt-1 leading-relaxed">
+                                    Tarjeta y transferencia forman parte de las ventas totales, pero no del efectivo físico en caja.
+                                </p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 
@@ -1551,7 +1754,10 @@ export default function POS() {
                                                     ? "bg-primary/10 border-primary/30"
                                                     : "bg-base-200/50 border-base-300/30 hover:bg-base-200"
                                             }`}
-                                            onClick={() => setSelectedClientId(c.publicId)}
+                                            onClick={() => {
+                                    setSelectedClientId(c.publicId);
+                                    loadClientLoyalty(c.publicId);
+                                }}
                                         >
                                             <div className="min-w-0">
                                                 <p className="text-sm font-medium truncate">{c.parentName}</p>
@@ -1561,9 +1767,33 @@ export default function POS() {
                                                         {c.childName}
                                                     </p>
                                                 )}
-                                                {c.phone && (
-                                                    <p className="text-[10px] text-base-content/30">{c.phone}</p>
-                                                )}
+                                    {c.phone && (
+                                        <p className="text-[10px] text-base-content/30">{c.phone}</p>
+                                    )}
+                                    {c.frequent && c.requiredCount != null && (
+                                        <div className="mt-1 flex items-center gap-1.5">
+                                            <div className="w-full max-w-[120px] bg-base-300/30 rounded-full h-1">
+                                                <div
+                                                    className="h-1 rounded-full bg-pink-500 transition-all"
+                                                    style={{
+                                                        width: `${Math.min(
+                                                            ((c.currentCount ?? 0) / (c.requiredCount ?? 5)) * 100,
+                                                            100
+                                                        )}%`,
+                                                    }}
+                                                />
+                                            </div>
+                                            <span className="text-[10px] text-base-content/40">
+                                                {c.currentCount ?? 0}/{c.requiredCount ?? 5}
+                                            </span>
+                                            {(c.rewardsAvailable ?? 0) > 0 && (
+                                                <span className="badge badge-xs badge-success gap-0.5">
+                                                    <Gift className="w-2 h-2" />
+                                                    {c.rewardsAvailable}
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
                                             </div>
                                             <button
                                                 className={`btn btn-xs rounded-lg ${
@@ -1646,7 +1876,31 @@ export default function POS() {
                         </div>
                     )}
 
-                    <div className="flex gap-2 pt-1">
+                        <div className="flex gap-2 pt-1">
+                        {(() => {
+                            const sel = selectedClientId ? clientSearchResults.find(c => c.publicId === selectedClientId) : null;
+                            const rewardsAvail = sel?.rewardsAvailable ?? 0;
+                            return clientMode === "frequent" && rewardsAvail > 0 && (
+                                <div className="flex items-center gap-2 px-3 py-2 bg-success/10 border border-success/20 rounded-xl flex-1">
+                                    <Gift className="w-4 h-4 text-success" />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-medium text-success">
+                                            {rewardsAvail} recompensa{rewardsAvail !== 1 ? "s" : ""} disponible{rewardsAvail !== 1 ? "s" : ""}
+                                        </p>
+                                    </div>
+                                    <label className="flex items-center gap-1 cursor-pointer">
+                                        <span className="text-[10px] text-base-content/50">Usar</span>
+                                        <input
+                                            type="checkbox"
+                                            className="toggle toggle-sm toggle-success"
+                                            checked={useReward}
+                                            onChange={(e) => setUseReward(e.target.checked)}
+                                        />
+                                    </label>
+                                </div>
+                            );
+                        })()}
+                    </div><div className="flex gap-2 pt-1">
                         <button
                             className="btn btn-ghost flex-1"
                             onClick={() => {
@@ -2052,53 +2306,64 @@ export default function POS() {
                     {!closeResult ? (
                         <>
                             {cash && (
-                                <div className="bg-base-200/50 rounded-xl p-4 space-y-2 border border-base-300/30">
-                                    <CashSummaryRow label="Monto apertura" value={cash.openingAmount ?? 0} emoji="🏦" />
-
-                                    <div className="divider my-1 text-[10px] text-base-content/30 uppercase tracking-wider">
-                                        Ventas por método
-                                    </div>
-
-                                    <CashSummaryRow label="Efectivo" value={cash.cashSales ?? 0} emoji="💵" />
-                                    <CashSummaryRow label="Tarjeta" value={cash.cardSales ?? 0} emoji="💳" />
-                                    <CashSummaryRow label="Transferencia" value={cash.transferSales ?? 0} emoji="🏦" />
-
-                                    <div className="border-t border-base-300/50 pt-2">
-                                        <CashSummaryRow label="Total ventas" value={cash.salesTotal ?? 0} bold />
-                                    </div>
-
-                                    <div className="border-t border-base-300/50 pt-2">
-                                        <div className="flex justify-between text-sm font-bold text-primary">
-                                            <span>📊 Esperado en caja</span>
-                                            <span>{formatMoney(cash.expectedCash ?? 0)}</span>
+                                <>
+                                    <div className="bg-base-200/50 rounded-xl p-4 space-y-2 border border-base-300/30">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <Receipt className="w-3.5 h-3.5 text-primary" />
+                                            <span className="text-xs font-bold text-base-content/50 uppercase tracking-wider">Desglose de ventas</span>
                                         </div>
-                                        <p className="text-[10px] text-base-content/30 mt-0.5">
-                                            = Apertura + Ventas en efectivo
+                                        <CashSummaryRow label="Efectivo" value={cash.cashSales ?? 0} emoji="💵" />
+                                        <CashSummaryRow label="Tarjeta" value={cash.cardSales ?? 0} emoji="💳" />
+                                        <CashSummaryRow label="Transferencia" value={cash.transferSales ?? 0} emoji="🏦" />
+                                        <div className="border-t border-base-300/50 pt-2">
+                                            <CashSummaryRow label="Total ventas" value={cash.salesTotal ?? 0} bold />
+                                        </div>
+                                        <p className="text-[10px] text-base-content/30 pt-1">
+                                            Tarjeta y transferencia no forman parte del efectivo físico en caja.
                                         </p>
                                     </div>
+
+                                    <div className="bg-base-200/50 rounded-xl p-4 space-y-2 border border-base-300/30">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <Vault className="w-3.5 h-3.5 text-success" />
+                                            <span className="text-xs font-bold text-base-content/50 uppercase tracking-wider">Movimientos de efectivo</span>
+                                        </div>
+                                        <CashSummaryRow label="Monto apertura" value={cash.openingAmount ?? 0} emoji="🏦" />
+                                        <CashSummaryRow label="Depósitos" value={cash.depositTotal ?? 0} emoji="📥" color="text-success" />
+                                        <CashSummaryRow label="Retiros" value={cash.withdrawalTotal ?? 0} emoji="📤" color="text-error" />
+                                        <div className="border-t border-base-300/50 pt-2">
+                                            <CashSummaryRow label="Efectivo esperado" value={cash.expectedCash ?? 0} bold color="text-success" />
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            <div className="bg-base-200/50 rounded-xl p-4 space-y-3 border border-base-300/30">
+                                <div className="flex items-center gap-2">
+                                    <Calculator className="w-3.5 h-3.5 text-warning" />
+                                    <span className="text-xs font-bold text-base-content/50 uppercase tracking-wider">Cierre de efectivo</span>
                                 </div>
-                            )}
+                                <fieldset className="fieldset">
+                                    <legend className="fieldset-legend text-xs flex items-center gap-1">
+                                        <DollarSign className="w-3 h-3" /> Efectivo contado
+                                    </legend>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        placeholder="0.00"
+                                        className="input input-bordered w-full text-lg font-bold"
+                                        value={countedCash}
+                                        onChange={(e) => setCountedCash(e.target.value)}
+                                        onKeyDown={(e) => e.key === "Enter" && handleCloseCash()}
+                                        autoFocus
+                                    />
+                                </fieldset>
 
-                            <fieldset className="fieldset">
-                                <legend className="fieldset-legend text-xs flex items-center gap-1">
-                                    <Calculator className="w-3 h-3" /> Efectivo contado
-                                </legend>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    placeholder="0.00"
-                                    className="input input-bordered w-full text-lg font-bold"
-                                    value={countedCash}
-                                    onChange={(e) => setCountedCash(e.target.value)}
-                                    onKeyDown={(e) => e.key === "Enter" && handleCloseCash()}
-                                    autoFocus
-                                />
-                            </fieldset>
-
-                            {countedCash && cash && (
-                                <DifferenceAlert counted={countedCash} expected={cash.expectedCash ?? 0} />
-                            )}
+                                {countedCash && cash && (
+                                    <DifferenceAlert counted={countedCash} expected={cash.expectedCash ?? 0} />
+                                )}
+                            </div>
 
                             <div className="flex gap-2">
                                 <button
@@ -2134,40 +2399,59 @@ export default function POS() {
                             </div>
 
                             <div className="bg-base-200/50 rounded-xl p-4 space-y-2 border border-base-300/30">
-                                <CashSummaryRow label="Monto apertura" value={closeResult.openingAmount ?? 0} emoji="🏦" />
-
-                                <div className="divider my-1 text-[10px] text-base-content/30 uppercase tracking-wider">
-                                    Desglose de ventas
+                                <div className="flex items-center gap-2 mb-1">
+                                    <Receipt className="w-3.5 h-3.5 text-primary" />
+                                    <span className="text-xs font-bold text-base-content/50 uppercase tracking-wider">Desglose de ventas</span>
                                 </div>
-
                                 <CashSummaryRow label="Efectivo" value={closeResult.cashSales ?? 0} emoji="💵" />
                                 <CashSummaryRow label="Tarjeta" value={closeResult.cardSales ?? 0} emoji="💳" />
                                 <CashSummaryRow label="Transferencia" value={closeResult.transferSales ?? 0} emoji="🏦" />
-
                                 <div className="border-t border-base-300/50 pt-2">
                                     <CashSummaryRow label="Total ventas" value={closeResult.salesTotal ?? 0} bold />
                                 </div>
+                            </div>
 
-                                <div className="border-t border-base-300/50 pt-2 space-y-1.5">
-                                    <CashSummaryRow label="Esperado" value={closeResult.expectedCash ?? 0} />
-                                    <CashSummaryRow label="Contado" value={closeResult.countedAmount ?? 0} />
+                            <div className="bg-base-200/50 rounded-xl p-4 space-y-2 border border-base-300/30">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <Vault className="w-3.5 h-3.5 text-success" />
+                                    <span className="text-xs font-bold text-base-content/50 uppercase tracking-wider">Movimientos de efectivo</span>
                                 </div>
+                                <CashSummaryRow label="Monto apertura" value={closeResult.openingAmount ?? 0} emoji="🏦" />
+                                <CashSummaryRow label="Depósitos" value={closeResult.depositTotal ?? 0} emoji="📥" color="text-success" />
+                                <CashSummaryRow label="Retiros" value={closeResult.withdrawalTotal ?? 0} emoji="📤" color="text-error" />
+                                <div className="border-t border-base-300/50 pt-2">
+                                    <CashSummaryRow label="Efectivo esperado" value={closeResult.expectedCash ?? 0} bold color="text-success" />
+                                </div>
+                            </div>
 
+                            <div className="bg-base-200/50 rounded-xl p-4 space-y-2 border border-base-300/30">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <Calculator className="w-3.5 h-3.5 text-warning" />
+                                    <span className="text-xs font-bold text-base-content/50 uppercase tracking-wider">Resultado del cierre</span>
+                                </div>
+                                <CashSummaryRow label="Efectivo esperado" value={closeResult.expectedCash ?? 0} />
+                                <CashSummaryRow label="Efectivo contado" value={closeResult.countedAmount ?? 0} />
                                 <div className="border-t border-base-300/50 pt-2">
                                     <div
-                                        className={`flex justify-between font-bold text-base ${(closeResult.difference ?? 0) < 0
-                                            ? "text-error"
-                                            : (closeResult.difference ?? 0) > 0
-                                                ? "text-warning"
-                                                : "text-success"
+                                        className={`flex items-center justify-between p-2 rounded-lg text-sm font-bold ${(closeResult.difference ?? 0) === 0
+                                                ? "bg-success/10 text-success"
+                                                : (closeResult.difference ?? 0) > 0
+                                                    ? "bg-warning/10 text-warning"
+                                                    : "bg-error/10 text-error"
                                             }`}
                                     >
-                                        <span>
+                                        <span className="flex items-center gap-1.5">
                                             {(closeResult.difference ?? 0) === 0
-                                                ? "✅ Diferencia"
+                                                ? <CheckCircle2 className="w-4 h-4" />
                                                 : (closeResult.difference ?? 0) > 0
-                                                    ? "⬆️ Sobrante"
-                                                    : "⬇️ Faltante"}
+                                                    ? <ArrowUp className="w-4 h-4" />
+                                                    : <ArrowDown className="w-4 h-4" />
+                                            }
+                                            {(closeResult.difference ?? 0) === 0
+                                                ? "Cuadre exacto"
+                                                : (closeResult.difference ?? 0) > 0
+                                                    ? "Sobrante"
+                                                    : "Faltante"}
                                         </span>
                                         <span>{formatMoney(closeResult.difference ?? 0)}</span>
                                     </div>
@@ -2194,6 +2478,181 @@ export default function POS() {
                             </button>
                         </div>
                     )}
+                </div>
+            </Modal>
+
+            <Modal
+                open={showWithdrawal}
+                onClose={() => {
+                    if (!processingMovement) setShowWithdrawal(false);
+                }}
+                maxWidth="max-w-sm"
+                closable={!processingMovement}
+            >
+                <ModalHeader
+                    icon={ArrowUp}
+                    iconColor="bg-error/10 text-error"
+                    title="Retirar efectivo"
+                    subtitle="Registra una salida de efectivo de la caja"
+                    onClose={!processingMovement ? () => setShowWithdrawal(false) : undefined}
+                />
+                <div className="p-5 pt-3 space-y-4">
+                    {cash && (
+                        <div className="bg-base-200/50 rounded-xl p-3 border border-base-300/30">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-base-content/50">Efectivo disponible</span>
+                                <span className="font-bold">{formatMoney(cash.expectedCash ?? 0)}</span>
+                            </div>
+                        </div>
+                    )}
+
+                    <fieldset className="fieldset">
+                        <legend className="fieldset-legend text-xs flex items-center gap-1">
+                            <DollarSign className="w-3 h-3" /> Monto
+                        </legend>
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            placeholder="0.00"
+                            className="input input-bordered w-full text-lg font-bold"
+                            value={movementAmount}
+                            onChange={(e) => setMovementAmount(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleMovement("withdraw")}
+                            autoFocus
+                        />
+                    </fieldset>
+
+                    <fieldset className="fieldset">
+                        <legend className="fieldset-legend text-xs flex items-center gap-1">
+                            Motivo
+                        </legend>
+                        <input
+                            type="text"
+                            placeholder="Ej: Pago proveedor, gasto operativo..."
+                            className="input input-bordered w-full"
+                            value={movementReason}
+                            onChange={(e) => setMovementReason(e.target.value)}
+                        />
+                    </fieldset>
+
+                    <fieldset className="fieldset">
+                        <legend className="fieldset-legend text-xs flex items-center gap-1">
+                            Notas <span className="text-base-content/30">(opcional)</span>
+                        </legend>
+                        <input
+                            type="text"
+                            placeholder="Detalle adicional..."
+                            className="input input-bordered w-full"
+                            value={movementNotes}
+                            onChange={(e) => setMovementNotes(e.target.value)}
+                        />
+                    </fieldset>
+
+                    <div className="flex gap-2 pt-1">
+                        <button
+                            className="btn btn-ghost flex-1"
+                            onClick={() => setShowWithdrawal(false)}
+                            disabled={processingMovement}
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            className="btn btn-error flex-1 gap-2 shadow-md"
+                            onClick={() => handleMovement("withdraw")}
+                            disabled={processingMovement}
+                        >
+                            {processingMovement ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <ArrowUp className="w-4 h-4" />
+                            )}
+                            Registrar retiro
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
+            <Modal
+                open={showDeposit}
+                onClose={() => {
+                    if (!processingMovement) setShowDeposit(false);
+                }}
+                maxWidth="max-w-sm"
+                closable={!processingMovement}
+            >
+                <ModalHeader
+                    icon={ArrowDown}
+                    iconColor="bg-success/10 text-success"
+                    title="Agregar efectivo a caja"
+                    subtitle="Registra una entrada de efectivo"
+                    onClose={!processingMovement ? () => setShowDeposit(false) : undefined}
+                />
+                <div className="p-5 pt-3 space-y-4">
+                    <fieldset className="fieldset">
+                        <legend className="fieldset-legend text-xs flex items-center gap-1">
+                            <DollarSign className="w-3 h-3" /> Monto
+                        </legend>
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            placeholder="0.00"
+                            className="input input-bordered w-full text-lg font-bold"
+                            value={movementAmount}
+                            onChange={(e) => setMovementAmount(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleMovement("deposit")}
+                            autoFocus
+                        />
+                    </fieldset>
+
+                    <fieldset className="fieldset">
+                        <legend className="fieldset-legend text-xs flex items-center gap-1">
+                            Motivo
+                        </legend>
+                        <input
+                            type="text"
+                            placeholder="Ej: Fondo adicional, reposición..."
+                            className="input input-bordered w-full"
+                            value={movementReason}
+                            onChange={(e) => setMovementReason(e.target.value)}
+                        />
+                    </fieldset>
+
+                    <fieldset className="fieldset">
+                        <legend className="fieldset-legend text-xs flex items-center gap-1">
+                            Notas <span className="text-base-content/30">(opcional)</span>
+                        </legend>
+                        <input
+                            type="text"
+                            placeholder="Detalle adicional..."
+                            className="input input-bordered w-full"
+                            value={movementNotes}
+                            onChange={(e) => setMovementNotes(e.target.value)}
+                        />
+                    </fieldset>
+
+                    <div className="flex gap-2 pt-1">
+                        <button
+                            className="btn btn-ghost flex-1"
+                            onClick={() => setShowDeposit(false)}
+                            disabled={processingMovement}
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            className="btn btn-success flex-1 gap-2 shadow-md"
+                            onClick={() => handleMovement("deposit")}
+                            disabled={processingMovement}
+                        >
+                            {processingMovement ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <ArrowDown className="w-4 h-4" />
+                            )}
+                            Registrar depósito
+                        </button>
+                    </div>
                 </div>
             </Modal>
         </div>

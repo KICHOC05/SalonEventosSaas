@@ -479,6 +479,8 @@ export interface CashRegisterResponse {
     salesTotal: number;
     expectedCash: number;
     expectedAmount: number;
+    depositTotal: number;
+    withdrawalTotal: number;
     countedAmount: number | null;
     difference: number | null;
     openedAt: string;
@@ -535,6 +537,156 @@ export async function updateCashOpeningAmount(
         method: "PUT",
         body: JSON.stringify(data),
     });
+}
+
+export type CashMovementType = "WITHDRAWAL" | "DEPOSIT";
+
+export interface CashMovementRequest {
+    amount: number;
+    reason: string;
+    notes?: string;
+}
+
+export interface CashMovementResponse {
+    publicId: string;
+    type: CashMovementType;
+    amount: number;
+    reason: string;
+    notes: string | null;
+    userName: string;
+    createdAt: string;
+}
+
+export async function createCashWithdrawal(
+    data: CashMovementRequest
+): Promise<CashMovementResponse> {
+    return apiFetch<CashMovementResponse>("/cash/movements/withdrawals", {
+        method: "POST",
+        body: JSON.stringify(data),
+    });
+}
+
+export async function createCashDeposit(
+    data: CashMovementRequest
+): Promise<CashMovementResponse> {
+    return apiFetch<CashMovementResponse>("/cash/movements/deposits", {
+        method: "POST",
+        body: JSON.stringify(data),
+    });
+}
+
+export async function getCurrentCashMovements(): Promise<CashMovementResponse[]> {
+    return apiFetch<CashMovementResponse[]>("/cash/movements/current");
+}
+
+export interface CashMovementHistoryParams {
+    page?: number;
+    size?: number;
+    type?: CashMovementType;
+    voided?: boolean;
+    userPublicId?: string;
+    from?: string;
+    to?: string;
+}
+
+export async function getCashMovementHistory(
+    params: CashMovementHistoryParams = {}
+): Promise<PageResponse<CashMovementResponse>> {
+    const searchParams = new URLSearchParams();
+    if (params.page !== undefined) searchParams.set("page", String(params.page));
+    if (params.size !== undefined) searchParams.set("size", String(params.size));
+    if (params.type) searchParams.set("type", params.type);
+    if (params.voided !== undefined) searchParams.set("voided", String(params.voided));
+    if (params.userPublicId) searchParams.set("userPublicId", params.userPublicId);
+    if (params.from) searchParams.set("from", params.from);
+    if (params.to) searchParams.set("to", params.to);
+    const qs = searchParams.toString();
+    return apiFetch<PageResponse<CashMovementResponse>>(
+        `/cash/movements${qs ? `?${qs}` : ""}`
+    );
+}
+
+export async function getCashMovementDetail(
+    publicId: string
+): Promise<CashMovementResponse> {
+    return apiFetch<CashMovementResponse>(`/cash/movements/${publicId}`);
+}
+
+export async function voidCashMovement(
+    publicId: string,
+    reason: string
+): Promise<CashMovementResponse> {
+    return apiFetch<CashMovementResponse>(`/cash/movements/${publicId}/void`, {
+        method: "PATCH",
+        body: JSON.stringify({ reason }),
+    });
+}
+
+export interface CashRegisterHistoryItem {
+    publicId: string;
+    status: string;
+    openingAmount: number;
+    closingAmount: number | null;
+    expectedAmount: number | null;
+    difference: number | null;
+    openedAt: string;
+    closedAt: string | null;
+    openedByName: string;
+    closedByName: string | null;
+    orderCount: number;
+    movementCount: number;
+}
+
+export interface CashRegisterDetail {
+    publicId: string;
+    status: string;
+    openingAmount: number;
+    cashSales: number;
+    cardSales: number;
+    transferSales: number;
+    salesTotal: number;
+    depositTotal: number;
+    withdrawalTotal: number;
+    expectedCash: number;
+    countedCash: number | null;
+    difference: number | null;
+    openedAt: string;
+    closedAt: string | null;
+    openedByName: string;
+    closedByName: string | null;
+    orderCount: number;
+    movementCount: number;
+}
+
+export interface CashRegisterHistoryParams {
+    page?: number;
+    size?: number;
+    status?: string;
+    openedByPublicId?: string;
+    from?: string;
+    to?: string;
+}
+
+export async function getCashRegisterHistory(
+    params: CashRegisterHistoryParams = {}
+): Promise<PageResponse<CashRegisterHistoryItem>> {
+    const searchParams = new URLSearchParams();
+    if (params.page !== undefined) searchParams.set("page", String(params.page));
+    if (params.size !== undefined) searchParams.set("size", String(params.size));
+    if (params.status) searchParams.set("status", params.status);
+    if (params.openedByPublicId) searchParams.set("openedByPublicId", params.openedByPublicId);
+    if (params.from) searchParams.set("from", params.from);
+    if (params.to) searchParams.set("to", params.to);
+    const qs = searchParams.toString();
+    return apiFetch<PageResponse<CashRegisterHistoryItem>>(
+        `/cash/history${qs ? `?${qs}` : ""}`
+    );
+}
+
+export async function getCashRegisterDetail(
+    publicId: string
+): Promise<CashRegisterDetail> {
+    return apiFetch<CashRegisterDetail>(`/cash/history/${publicId}`);
 }
 
 // =====================================================
@@ -743,6 +895,12 @@ export interface ClientResponse {
     frequent: boolean;
     status: string;
     createdAt: string;
+    currentCount?: number;
+    requiredCount?: number;
+    rewardsEarned?: number;
+    rewardsAvailable?: number;
+    rewardsRedeemed?: number;
+    lastVisitAt?: string | null;
 }
 
 export interface ClientRequest {
@@ -781,6 +939,72 @@ export async function createClient(data: ClientRequest): Promise<ClientResponse>
 
 export async function getClientByPublicId(publicId: string): Promise<ClientResponse> {
     return apiFetch<ClientResponse>(`/clients/${publicId}`);
+}
+
+// =====================================================
+// LOYALTY
+// =====================================================
+
+export interface LoyaltyProgramResponse {
+    publicId: string;
+    name: string;
+    description: string;
+    qualifyingProductPublicId: string;
+    qualifyingProductName: string;
+    requiredPurchases: number;
+    rewardQuantity: number;
+    rewardDescription: string;
+    active: boolean;
+}
+
+export interface LoyaltyProgramRequest {
+    name?: string;
+    description?: string;
+    qualifyingProductPublicId?: string;
+    requiredPurchases?: number;
+    rewardQuantity?: number;
+    rewardDescription?: string;
+    active?: boolean;
+}
+
+export interface ClientLoyaltyResponse {
+    totalVisits: number;
+    requiredPurchases: number;
+    rewardsEarned: number;
+    rewardsAvailable: number;
+    rewardsRedeemed: number;
+    nextRewardAt: number;
+}
+
+export async function fetchLoyaltyProgram(): Promise<LoyaltyProgramResponse> {
+    return apiFetch<LoyaltyProgramResponse>("/loyalty/program");
+}
+
+export async function updateLoyaltyProgram(
+    data: LoyaltyProgramRequest
+): Promise<LoyaltyProgramResponse> {
+    return apiFetch<LoyaltyProgramResponse>("/loyalty/program", {
+        method: "PUT",
+        body: JSON.stringify(data),
+    });
+}
+
+export async function fetchClientLoyalty(
+    clientPublicId: string
+): Promise<ClientLoyaltyResponse> {
+    return apiFetch<ClientLoyaltyResponse>(
+        `/loyalty/clients/${clientPublicId}`
+    );
+}
+
+export async function redeemLoyaltyReward(
+    orderPublicId: string,
+    clientPublicId: string
+): Promise<OrderResponse> {
+    return apiFetch<OrderResponse>(`/loyalty/redeem/${orderPublicId}`, {
+        method: "POST",
+        body: JSON.stringify({ orderPublicId, clientPublicId }),
+    });
 }
 
 // =====================================================

@@ -18,4 +18,11 @@ public class ClientResponse {
     private Boolean frequent;
     private String status;
     private LocalDateTime createdAt;
+
+    private Integer currentCount;
+    private Integer requiredCount;
+    private Long rewardsEarned;
+    private Long rewardsAvailable;
+    private Long rewardsRedeemed;
+    private LocalDateTime lastVisitAt;
 }

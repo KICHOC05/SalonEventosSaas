@@ -6,6 +6,10 @@ import com.example.demo.client.dto.ClientRequest;
 import com.example.demo.client.dto.ClientResponse;
 import com.example.demo.client.model.Client;
 import com.example.demo.client.repository.ClientRepository;
+import com.example.demo.loyalty.model.ClientLoyaltyProgress;
+import com.example.demo.loyalty.model.LoyaltyProgram;
+import com.example.demo.loyalty.repository.ClientLoyaltyProgressRepository;
+import com.example.demo.loyalty.repository.LoyaltyProgramRepository;
 import com.example.demo.security.TenantContext;
 import com.example.demo.tenant.model.Tenant;
 import com.example.demo.tenant.repository.TenantRepository;
@@ -28,6 +32,8 @@ public class ClientService {
     private final ClientRepository clientRepository;
     private final TenantRepository tenantRepository;
     private final BranchRepository branchRepository;
+    private final LoyaltyProgramRepository loyaltyProgramRepository;
+    private final ClientLoyaltyProgressRepository loyaltyProgressRepository;
 
     @Transactional(readOnly = true)
     public Page<ClientResponse> search(int page, int size, String search, Boolean frequent) {
@@ -72,6 +78,40 @@ public class ClientService {
         return mapToResponse(client);
     }
 
+    private void populateLoyaltyProgress(ClientResponse r, Client client) {
+        Long tenantId = TenantContext.getTenantId();
+        Long branchId = TenantContext.getBranchId();
+
+        LoyaltyProgram program = loyaltyProgramRepository
+                .findByTenant_IdAndBranch_Id(tenantId, branchId)
+                .orElse(null);
+
+        int required = program != null ? program.getRequiredPurchases() : 5;
+
+        if (program != null && Boolean.TRUE.equals(program.getActive())) {
+            ClientLoyaltyProgress progress = loyaltyProgressRepository
+                    .findByClient_IdAndLoyaltyProgram_Id(client.getId(), program.getId())
+                    .orElse(null);
+
+            if (progress != null) {
+                r.setCurrentCount(progress.getCurrentCount());
+                r.setRequiredCount(progress.getRequiredCount() != null ? progress.getRequiredCount() : required);
+                r.setRewardsEarned(progress.getRewardsEarned());
+                r.setRewardsAvailable(progress.getRewardsAvailable());
+                r.setRewardsRedeemed(progress.getRewardsRedeemed());
+                r.setLastVisitAt(progress.getLastVisitAt());
+                return;
+            }
+        }
+
+        r.setCurrentCount(0);
+        r.setRequiredCount(required);
+        r.setRewardsEarned(0L);
+        r.setRewardsAvailable(0L);
+        r.setRewardsRedeemed(0L);
+        r.setLastVisitAt(null);
+    }
+
     private ClientResponse mapToResponse(Client client) {
         ClientResponse r = new ClientResponse();
         r.setPublicId(client.getPublicId());
@@ -84,6 +124,9 @@ public class ClientService {
         r.setFrequent(client.getFrequent());
         r.setStatus(client.getStatus().name());
         r.setCreatedAt(client.getCreatedAt());
+
+        populateLoyaltyProgress(r, client);
+
         return r;
     }
 }
