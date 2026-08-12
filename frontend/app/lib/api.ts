@@ -843,6 +843,7 @@ export interface OrderHistoryItem {
 export interface OrderHistoryRecord {
     publicId: string;
     shortCode: string;
+    orderNumber: number;
     createdAt: string;
     closedAt: string | null;
     customerName: string | null;

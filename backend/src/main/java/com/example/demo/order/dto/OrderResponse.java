@@ -13,6 +13,7 @@ import java.util.List;
 public class OrderResponse {
 
     private String publicId;
+    private Long orderNumber;
 
     private OrderStatus status;
 

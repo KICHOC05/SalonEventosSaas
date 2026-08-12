@@ -155,12 +155,15 @@ public class TicketService {
 
                 ticket.append("<div class='line'></div>");
 
-                String orderId = order.getPublicId().length() > 8
+                String orderNumber = String.format("#%06d", order.getId());
+                String folio = order.getPublicId().length() > 8
                                 ? order.getPublicId().substring(0, 8).toUpperCase()
                                 : order.getPublicId().toUpperCase();
 
-                ticket.append("<div class='item'><span>Orden:</span><span>")
-                                .append(orderId).append("</span></div>");
+                ticket.append("<div class='item'><span>No. de orden:</span><span>")
+                                .append(orderNumber).append("</span></div>");
+                ticket.append("<div class='item'><span>Folio:</span><span>")
+                                .append(folio).append("</span></div>");
                 ticket.append("<div class='item'><span>Fecha:</span><span>")
                                 .append(order.getCreatedAt().format(
                                                 DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))

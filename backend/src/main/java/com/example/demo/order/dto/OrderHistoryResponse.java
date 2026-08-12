@@ -11,6 +11,7 @@ public class OrderHistoryResponse {
 
     private String publicId;
     private String shortCode;
+    private Long orderNumber;
     private LocalDateTime createdAt;
     private LocalDateTime closedAt;
     private String customerName;

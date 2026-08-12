@@ -450,6 +450,7 @@ public class OrderService {
         OrderResponse response = new OrderResponse();
 
         response.setPublicId(order.getPublicId());
+        response.setOrderNumber(order.getId());
         response.setStatus(order.getStatus());
         response.setCustomerName(order.getCustomerName());
         // REMOVED: order.getChildName() ya no existe en Order
@@ -528,6 +529,7 @@ public class OrderService {
         OrderHistoryResponse r = new OrderHistoryResponse();
 
         r.setPublicId(order.getPublicId());
+        r.setOrderNumber(order.getId());
         r.setShortCode(order.getPublicId().length() > 8
                 ? order.getPublicId().substring(0, 8).toUpperCase()
                 : order.getPublicId().toUpperCase());
