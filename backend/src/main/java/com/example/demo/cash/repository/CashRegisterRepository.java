@@ -24,6 +24,18 @@ public interface CashRegisterRepository extends JpaRepository<CashRegister, Long
     Optional<CashRegister> findByBranch_IdAndStatus(Long branchId, CashStatus status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT c FROM CashRegister c
+        WHERE c.tenant.id = :tenantId
+          AND c.branch.id = :branchId
+          AND c.status = :status
+    """)
+    Optional<CashRegister> findByTenant_IdAndBranch_IdAndStatusForUpdate(
+            @Param("tenantId") Long tenantId,
+            @Param("branchId") Long branchId,
+            @Param("status") CashStatus status);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT c FROM CashRegister c WHERE c.branch.id = :branchId AND c.status = :status")
     Optional<CashRegister> findByBranch_IdAndStatusForUpdate(
             @Param("branchId") Long branchId,

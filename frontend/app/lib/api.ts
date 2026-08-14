@@ -530,6 +530,12 @@ export interface CashRegisterResponse {
     cashSales: number;
     cardSales: number;
     transferSales: number;
+    posCashSales: number;
+    eventCashPayments: number;
+    posCardSales: number;
+    eventCardPayments: number;
+    posTransferSales: number;
+    eventTransferPayments: number;
     salesTotal: number;
     expectedCash: number;
     expectedAmount: number;
@@ -698,6 +704,12 @@ export interface CashRegisterDetail {
     cashSales: number;
     cardSales: number;
     transferSales: number;
+    posCashSales: number;
+    eventCashPayments: number;
+    posCardSales: number;
+    eventCardPayments: number;
+    posTransferSales: number;
+    eventTransferPayments: number;
     salesTotal: number;
     depositTotal: number;
     withdrawalTotal: number;

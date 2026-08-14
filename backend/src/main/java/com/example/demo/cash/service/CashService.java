@@ -7,6 +7,8 @@ import com.example.demo.cash.repository.CashMovementRepository;
 import com.example.demo.cash.repository.CashRegisterRepository;
 import com.example.demo.common.enums.CashMovementType;
 import com.example.demo.common.enums.CashStatus;
+import com.example.demo.common.enums.PaymentMethod;
+import com.example.demo.event.repository.EventPaymentRepository;
 import com.example.demo.payment.repository.PaymentRepository;
 import com.example.demo.security.TenantContext;
 import com.example.demo.branch.model.Branch;
@@ -36,6 +38,7 @@ public class CashService {
     private final CashRegisterRepository cashRegisterRepository;
     private final CashMovementRepository cashMovementRepository;
     private final PaymentRepository paymentRepository;
+    private final EventPaymentRepository eventPaymentRepository;
     private final TenantRepository tenantRepository;
     private final BranchRepository branchRepository;
     private final UserRepository userRepository;
@@ -43,8 +46,14 @@ public class CashService {
 
     private record CashSummary(
             BigDecimal openingAmount,
+            BigDecimal posCashSales,
+            BigDecimal eventCashPayments,
             BigDecimal cashSales,
+            BigDecimal posCardSales,
+            BigDecimal eventCardPayments,
             BigDecimal cardSales,
+            BigDecimal posTransferSales,
+            BigDecimal eventTransferPayments,
             BigDecimal transferSales,
             BigDecimal depositTotal,
             BigDecimal withdrawalTotal,
@@ -287,6 +296,12 @@ public class CashService {
                 .cashSales(summary.cashSales())
                 .cardSales(summary.cardSales())
                 .transferSales(summary.transferSales())
+                .posCashSales(summary.posCashSales())
+                .eventCashPayments(summary.eventCashPayments())
+                .posCardSales(summary.posCardSales())
+                .eventCardPayments(summary.eventCardPayments())
+                .posTransferSales(summary.posTransferSales())
+                .eventTransferPayments(summary.eventTransferPayments())
                 .salesTotal(totalSales)
                 .depositTotal(summary.depositTotal())
                 .withdrawalTotal(summary.withdrawalTotal())
@@ -306,12 +321,25 @@ public class CashService {
 
     private CashSummary calculateCashSummary(CashRegister cash) {
         LocalDateTime start = cash.getOpenedAt();
-        LocalDateTime end = LocalDateTime.now();
+        LocalDateTime end = cash.getClosedAt() != null
+                ? cash.getClosedAt()
+                : LocalDateTime.now();
         Long branchId = cash.getBranch().getId();
 
-        BigDecimal cashSales = safe(paymentRepository.sumCashPayments(branchId, start, end));
-        BigDecimal cardSales = safe(paymentRepository.sumCardPayments(branchId, start, end));
-        BigDecimal transferSales = safe(paymentRepository.sumTransferPayments(branchId, start, end));
+        BigDecimal posCashSales = safe(paymentRepository.sumCashPayments(branchId, start, end));
+        BigDecimal posCardSales = safe(paymentRepository.sumCardPayments(branchId, start, end));
+        BigDecimal posTransferSales = safe(paymentRepository.sumTransferPayments(branchId, start, end));
+
+        BigDecimal eventCashPayments = safe(eventPaymentRepository.sumByCashRegisterAndPaymentMethod(
+                cash.getId(), PaymentMethod.CASH));
+        BigDecimal eventCardPayments = safe(eventPaymentRepository.sumByCashRegisterAndPaymentMethod(
+                cash.getId(), PaymentMethod.CARD));
+        BigDecimal eventTransferPayments = safe(eventPaymentRepository.sumByCashRegisterAndPaymentMethod(
+                cash.getId(), PaymentMethod.TRANSFER));
+
+        BigDecimal cashSales = posCashSales.add(eventCashPayments);
+        BigDecimal cardSales = posCardSales.add(eventCardPayments);
+        BigDecimal transferSales = posTransferSales.add(eventTransferPayments);
 
         BigDecimal depositTotal = safe(cashMovementRepository.sumByCashRegisterAndType(
                 cash.getId(), CashMovementType.DEPOSIT));
@@ -325,8 +353,14 @@ public class CashService {
 
         return new CashSummary(
                 cash.getOpeningAmount(),
+                posCashSales,
+                eventCashPayments,
                 cashSales,
+                posCardSales,
+                eventCardPayments,
                 cardSales,
+                posTransferSales,
+                eventTransferPayments,
                 transferSales,
                 depositTotal,
                 withdrawalTotal,
@@ -363,6 +397,12 @@ public class CashService {
         response.setCashSales(summary.cashSales());
         response.setCardSales(summary.cardSales());
         response.setTransferSales(summary.transferSales());
+        response.setPosCashSales(summary.posCashSales());
+        response.setEventCashPayments(summary.eventCashPayments());
+        response.setPosCardSales(summary.posCardSales());
+        response.setEventCardPayments(summary.eventCardPayments());
+        response.setPosTransferSales(summary.posTransferSales());
+        response.setEventTransferPayments(summary.eventTransferPayments());
 
         response.setSalesTotal(totalSales);
         response.setExpectedCash(summary.expectedCash());

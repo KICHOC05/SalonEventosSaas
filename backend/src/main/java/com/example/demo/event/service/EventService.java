@@ -2,6 +2,9 @@ package com.example.demo.event.service;
 
 import com.example.demo.branch.model.Branch;
 import com.example.demo.branch.repository.BranchRepository;
+import com.example.demo.cash.model.CashRegister;
+import com.example.demo.cash.repository.CashRegisterRepository;
+import com.example.demo.common.enums.CashStatus;
 import com.example.demo.common.enums.EventStatus;
 import com.example.demo.common.enums.PaymentMethod;
 import com.example.demo.common.enums.ProductType;
@@ -56,6 +59,7 @@ public class EventService {
     private final BranchRepository branchRepository;
     private final UserRepository userRepository;
     private final DocumentSequenceService documentSequenceService;
+    private final CashRegisterRepository cashRegisterRepository;
 
     private static final List<EventStatus> ACTIVE_STATUSES = List.of(
             EventStatus.PENDING_DEPOSIT,
@@ -268,6 +272,10 @@ public class EventService {
             }
         }
 
+        CashRegister initialPaymentCashRegister = depositAmount.compareTo(BigDecimal.ZERO) > 0
+                ? requireOpenCashRegister(tenantId, branchId)
+                : null;
+
         long eventNumber = documentSequenceService.nextNumber(
                 tenant,
                 branch,
@@ -302,6 +310,7 @@ public class EventService {
                     .eventBooking(savedEvent)
                     .tenant(tenant)
                     .branch(branch)
+                    .cashRegister(initialPaymentCashRegister)
                     .amount(depositAmount)
                     .eventPriceAtPayment(eventPrice)
                     .paymentMethod(request.getInitialPaymentMethod())
@@ -752,12 +761,17 @@ public class EventService {
     @Transactional
     public EventPaymentResponse registerEventPayment(String eventPublicId, RegisterEventPaymentRequest request) {
         Long tenantId = TenantContext.getTenantId();
+        Long branchId = TenantContext.getBranchId();
 
         EventBooking event = eventBookingRepository.findByPublicId(eventPublicId)
                 .orElseThrow(() -> new EntityNotFoundException("Evento no encontrado"));
 
         if (!event.getTenant().getId().equals(tenantId)) {
             throw new SecurityException("No tiene acceso a este evento");
+        }
+
+        if (!event.getBranch().getId().equals(branchId)) {
+            throw new SecurityException("El pago debe registrarse desde la sucursal del evento");
         }
 
         if (event.getStatus() == EventStatus.CANCELLED) {
@@ -788,11 +802,14 @@ public class EventService {
             }
         }
 
+        CashRegister cashRegister = requireOpenCashRegister(tenantId, branchId);
+
         // Crear el registro de pago
         EventPayment payment = EventPayment.builder()
                 .eventBooking(event)
                 .tenant(event.getTenant())
                 .branch(event.getBranch())
+                .cashRegister(cashRegister)
                 .amount(request.getAmount())
                 .eventPriceAtPayment(event.getEventPrice())
                 .paymentMethod(request.getPaymentMethod())
@@ -813,6 +830,14 @@ public class EventService {
         log.info("Pago registrado para evento {}: ${} con {}", eventPublicId, request.getAmount(), request.getPaymentMethod());
 
         return mapToPaymentResponse(payment);
+    }
+
+    private CashRegister requireOpenCashRegister(Long tenantId, Long branchId) {
+        return cashRegisterRepository
+                .findByTenant_IdAndBranch_IdAndStatusForUpdate(
+                        tenantId, branchId, CashStatus.OPEN)
+                .orElseThrow(() -> new IllegalStateException(
+                        "No hay caja abierta en la sucursal para registrar el pago del evento"));
     }
 
     @Transactional(readOnly = true)

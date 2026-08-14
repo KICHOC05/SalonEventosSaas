@@ -1,6 +1,7 @@
 package com.example.demo.event.model;
 
 import com.example.demo.branch.model.Branch;
+import com.example.demo.cash.model.CashRegister;
 import com.example.demo.common.enums.PaymentMethod;
 import com.example.demo.tenant.model.Tenant;
 import jakarta.persistence.*;
@@ -42,6 +43,10 @@ public class EventPayment {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "branch_id", nullable = false)
     private Branch branch;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cash_register_id")
+    private CashRegister cashRegister;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;

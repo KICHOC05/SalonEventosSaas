@@ -14,6 +14,13 @@ public class CashRegisterResponse {
     private BigDecimal cardSales;
     private BigDecimal transferSales;
 
+    private BigDecimal posCashSales;
+    private BigDecimal eventCashPayments;
+    private BigDecimal posCardSales;
+    private BigDecimal eventCardPayments;
+    private BigDecimal posTransferSales;
+    private BigDecimal eventTransferPayments;
+
     private BigDecimal salesTotal;
     private BigDecimal expectedCash;
     private BigDecimal expectedAmount;

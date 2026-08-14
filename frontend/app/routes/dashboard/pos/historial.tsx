@@ -717,8 +717,11 @@ function CashRegistersTab() {
                             <div className="bg-base-200/50 rounded-xl p-4 space-y-2 border border-base-300/30">
                                 <p className="text-[10px] uppercase text-base-content/40 font-bold">Ventas</p>
                                 <div className="flex justify-between text-sm"><span>Efectivo</span><span>{formatCurrency(detailRegister.cashSales)}</span></div>
+                                <div className="flex justify-between text-xs text-base-content/50 pl-3"><span>POS / Eventos</span><span>{formatCurrency(detailRegister.posCashSales ?? 0)} / {formatCurrency(detailRegister.eventCashPayments ?? 0)}</span></div>
                                 <div className="flex justify-between text-sm"><span>Tarjeta</span><span>{formatCurrency(detailRegister.cardSales)}</span></div>
+                                <div className="flex justify-between text-xs text-base-content/50 pl-3"><span>POS / Eventos</span><span>{formatCurrency(detailRegister.posCardSales ?? 0)} / {formatCurrency(detailRegister.eventCardPayments ?? 0)}</span></div>
                                 <div className="flex justify-between text-sm"><span>Transferencia</span><span>{formatCurrency(detailRegister.transferSales)}</span></div>
+                                <div className="flex justify-between text-xs text-base-content/50 pl-3"><span>POS / Eventos</span><span>{formatCurrency(detailRegister.posTransferSales ?? 0)} / {formatCurrency(detailRegister.eventTransferPayments ?? 0)}</span></div>
                                 <div className="border-t border-base-300/50 pt-1 flex justify-between text-sm font-bold"><span>Total ventas</span><span>{formatCurrency(detailRegister.salesTotal)}</span></div>
                             </div>
 

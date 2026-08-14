@@ -1194,6 +1194,10 @@ export default function POS() {
                             <div className="px-4 pb-4 space-y-2 border-t border-success/10 pt-3">
                                 <CashSummaryRow label="Monto apertura" value={cash.openingAmount ?? 0} emoji="🏦" />
                                 <CashSummaryRow label="Ventas en efectivo" value={cash.cashSales ?? 0} emoji="💵" color="text-success" />
+                                <div className="pl-7 text-[11px] text-base-content/45 space-y-0.5">
+                                    <div className="flex justify-between"><span>POS</span><span>{formatMoney(cash.posCashSales ?? 0)}</span></div>
+                                    <div className="flex justify-between"><span>Eventos</span><span>{formatMoney(cash.eventCashPayments ?? 0)}</span></div>
+                                </div>
                                 {(cash.depositTotal ?? 0) > 0 && (
                                     <CashSummaryRow label="Depósitos" value={cash.depositTotal ?? 0} emoji="📥" color="text-success" />
                                 )}
@@ -1229,8 +1233,11 @@ export default function POS() {
                         {showSalesDetail && (
                             <div className="px-4 pb-4 space-y-2 border-t border-base-300/30 pt-3">
                                 <CashSummaryRow label="Efectivo" value={cash.cashSales ?? 0} emoji="💵" />
+                                <div className="pl-7 text-[11px] text-base-content/45 flex justify-between"><span>POS / Eventos</span><span>{formatMoney(cash.posCashSales ?? 0)} / {formatMoney(cash.eventCashPayments ?? 0)}</span></div>
                                 <CashSummaryRow label="Tarjeta" value={cash.cardSales ?? 0} emoji="💳" />
+                                <div className="pl-7 text-[11px] text-base-content/45 flex justify-between"><span>POS / Eventos</span><span>{formatMoney(cash.posCardSales ?? 0)} / {formatMoney(cash.eventCardPayments ?? 0)}</span></div>
                                 <CashSummaryRow label="Transferencia" value={cash.transferSales ?? 0} emoji="🏦" />
+                                <div className="pl-7 text-[11px] text-base-content/45 flex justify-between"><span>POS / Eventos</span><span>{formatMoney(cash.posTransferSales ?? 0)} / {formatMoney(cash.eventTransferPayments ?? 0)}</span></div>
                                 <div className="border-t border-base-300/40 pt-2 mt-2">
                                     <CashSummaryRow label="Total ventas" value={cash.salesTotal ?? 0} bold />
                                 </div>
@@ -2313,8 +2320,11 @@ export default function POS() {
                                             <span className="text-xs font-bold text-base-content/50 uppercase tracking-wider">Desglose de ventas</span>
                                         </div>
                                         <CashSummaryRow label="Efectivo" value={cash.cashSales ?? 0} emoji="💵" />
+                                        <div className="pl-7 text-[11px] text-base-content/45 flex justify-between"><span>POS / Eventos</span><span>{formatMoney(cash.posCashSales ?? 0)} / {formatMoney(cash.eventCashPayments ?? 0)}</span></div>
                                         <CashSummaryRow label="Tarjeta" value={cash.cardSales ?? 0} emoji="💳" />
+                                        <div className="pl-7 text-[11px] text-base-content/45 flex justify-between"><span>POS / Eventos</span><span>{formatMoney(cash.posCardSales ?? 0)} / {formatMoney(cash.eventCardPayments ?? 0)}</span></div>
                                         <CashSummaryRow label="Transferencia" value={cash.transferSales ?? 0} emoji="🏦" />
+                                        <div className="pl-7 text-[11px] text-base-content/45 flex justify-between"><span>POS / Eventos</span><span>{formatMoney(cash.posTransferSales ?? 0)} / {formatMoney(cash.eventTransferPayments ?? 0)}</span></div>
                                         <div className="border-t border-base-300/50 pt-2">
                                             <CashSummaryRow label="Total ventas" value={cash.salesTotal ?? 0} bold />
                                         </div>
@@ -2404,8 +2414,11 @@ export default function POS() {
                                     <span className="text-xs font-bold text-base-content/50 uppercase tracking-wider">Desglose de ventas</span>
                                 </div>
                                 <CashSummaryRow label="Efectivo" value={closeResult.cashSales ?? 0} emoji="💵" />
+                                <div className="pl-7 text-[11px] text-base-content/45 flex justify-between"><span>POS / Eventos</span><span>{formatMoney(closeResult.posCashSales ?? 0)} / {formatMoney(closeResult.eventCashPayments ?? 0)}</span></div>
                                 <CashSummaryRow label="Tarjeta" value={closeResult.cardSales ?? 0} emoji="💳" />
+                                <div className="pl-7 text-[11px] text-base-content/45 flex justify-between"><span>POS / Eventos</span><span>{formatMoney(closeResult.posCardSales ?? 0)} / {formatMoney(closeResult.eventCardPayments ?? 0)}</span></div>
                                 <CashSummaryRow label="Transferencia" value={closeResult.transferSales ?? 0} emoji="🏦" />
+                                <div className="pl-7 text-[11px] text-base-content/45 flex justify-between"><span>POS / Eventos</span><span>{formatMoney(closeResult.posTransferSales ?? 0)} / {formatMoney(closeResult.eventTransferPayments ?? 0)}</span></div>
                                 <div className="border-t border-base-300/50 pt-2">
                                     <CashSummaryRow label="Total ventas" value={closeResult.salesTotal ?? 0} bold />
                                 </div>
