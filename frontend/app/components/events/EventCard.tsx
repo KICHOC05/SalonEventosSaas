@@ -1,8 +1,9 @@
 import { Eye, Check, Play, CheckCircle, Loader2, XCircle } from "lucide-react";
-import { getStatusBadge, formatCurrency, formatTime, canConfirm, canStart, canComplete, canCancel } from "~/utils/eventHelpers";
+import { getStatusBadge, formatCurrency, formatEventNumber, formatTime, canConfirm, canStart, canComplete, canCancel } from "~/utils/eventHelpers";
 
 interface EventCardItem {
   publicId: string;
+  eventNumber: number;
   customerName: string;
   childName: string;
   eventDate: string;
@@ -61,6 +62,9 @@ export default function EventCard({
       {/* Info */}
       <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
         <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-mono text-xs font-bold text-primary">
+            {formatEventNumber(event.eventNumber)}
+          </span>
           <span className="font-semibold text-sm truncate">{event.customerName}</span>
           <span
             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium"

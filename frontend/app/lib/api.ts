@@ -466,6 +466,60 @@ export async function fetchEventPayments(
   return apiFetch<EventPaymentResponse[]>(`/events/${publicId}/payments`);
 }
 
+export async function getEventTicket(eventPublicId: string): Promise<string> {
+    const auth = getStoredAuth();
+    const headers: Record<string, string> = {};
+    if (auth?.token) {
+        headers["Authorization"] = `Bearer ${auth.token}`;
+    }
+    const res = await fetch(`${API_BASE}/events/${eventPublicId}/ticket`, {
+        headers,
+    });
+
+    if (res.status === 401 || res.status === 403) {
+        clearStoredAuth();
+        if (
+            typeof window !== "undefined" &&
+            window.location.pathname.startsWith("/dashboard")
+        ) {
+            window.location.href = "/dashboard/login";
+        }
+        throw new ApiError("Sesión expirada", res.status);
+    }
+
+    if (!res.ok) throw new ApiError("Error al obtener ticket", res.status);
+    return res.text();
+}
+
+export async function getEventPaymentReceipt(
+  eventPublicId: string,
+  paymentPublicId: string
+): Promise<string> {
+    const auth = getStoredAuth();
+    const headers: Record<string, string> = {};
+    if (auth?.token) {
+        headers["Authorization"] = `Bearer ${auth.token}`;
+    }
+    const res = await fetch(
+        `${API_BASE}/events/${eventPublicId}/payments/${paymentPublicId}/receipt`,
+        { headers }
+    );
+
+    if (res.status === 401 || res.status === 403) {
+        clearStoredAuth();
+        if (
+            typeof window !== "undefined" &&
+            window.location.pathname.startsWith("/dashboard")
+        ) {
+            window.location.href = "/dashboard/login";
+        }
+        throw new ApiError("Sesión expirada", res.status);
+    }
+
+    if (!res.ok) throw new ApiError("Error al obtener recibo", res.status);
+    return res.text();
+}
+
 // =====================================================
 // CASH REGISTER
 // =====================================================

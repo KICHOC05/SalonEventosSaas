@@ -17,9 +17,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
+ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/events")
@@ -122,5 +123,15 @@ public class EventController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime end,
             @RequestParam(required = false) String excludePublicId) {
         return eventService.checkAvailability(date, start, end, excludePublicId);
+    }
+
+    @GetMapping("/payment-audit")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Map<String, Object> paymentAudit() {
+        List<Map<String, Object>> events = eventService.auditEventPaymentConsistency();
+        return Map.of(
+                "inconsistentEvents", events.size(),
+                "events", events
+        );
     }
 }

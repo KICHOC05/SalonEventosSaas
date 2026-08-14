@@ -5,6 +5,8 @@ import com.example.demo.branch.repository.BranchRepository;
 import com.example.demo.common.enums.EventStatus;
 import com.example.demo.common.enums.PaymentMethod;
 import com.example.demo.common.enums.ProductType;
+import com.example.demo.document.model.DocumentType;
+import com.example.demo.document.service.DocumentSequenceService;
 import com.example.demo.event.dto.AvailabilityResponse;
 import com.example.demo.event.dto.CreateEventRequest;
 import com.example.demo.event.dto.EventCalendarResponse;
@@ -39,6 +41,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -52,6 +55,7 @@ public class EventService {
     private final TenantRepository tenantRepository;
     private final BranchRepository branchRepository;
     private final UserRepository userRepository;
+    private final DocumentSequenceService documentSequenceService;
 
     private static final List<EventStatus> ACTIVE_STATUSES = List.of(
             EventStatus.PENDING_DEPOSIT,
@@ -227,7 +231,7 @@ public class EventService {
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new EntityNotFoundException("Tenant no encontrado"));
 
-        Branch branch = branchRepository.findById(branchId)
+        Branch branch = branchRepository.findByIdAndTenant_Id(branchId, tenantId)
                 .orElseThrow(() -> new EntityNotFoundException("Sucursal no encontrada"));
 
         Product packageProduct = productRepository.findByPublicIdAndTenant_IdAndActiveTrue(
@@ -257,9 +261,23 @@ public class EventService {
                 eventPrice
         );
 
+        if (depositAmount.compareTo(BigDecimal.ZERO) > 0) {
+            if (request.getInitialPaymentMethod() == null) {
+                throw new IllegalArgumentException(
+                        "El método de pago inicial es obligatorio cuando el anticipo es mayor a 0");
+            }
+        }
+
+        long eventNumber = documentSequenceService.nextNumber(
+                tenant,
+                branch,
+                DocumentType.EVENT
+        );
+
         EventBooking event = EventBooking.builder()
                 .tenant(tenant)
                 .branch(branch)
+                .eventNumber(eventNumber)
                 .packageProduct(packageProduct)
                 .customerName(request.getCustomerName())
                 .phone(request.getPhone())
@@ -278,6 +296,24 @@ public class EventService {
                 .build();
 
         EventBooking savedEvent = eventBookingRepository.save(event);
+
+        if (depositAmount.compareTo(BigDecimal.ZERO) > 0) {
+            EventPayment initialPayment = EventPayment.builder()
+                    .eventBooking(savedEvent)
+                    .tenant(tenant)
+                    .branch(branch)
+                    .amount(depositAmount)
+                    .eventPriceAtPayment(eventPrice)
+                    .paymentMethod(request.getInitialPaymentMethod())
+                    .reference(request.getInitialPaymentReference())
+                    .notes(request.getInitialPaymentNotes())
+                    .receivedByUserPublicId(getCurrentUserPublicId())
+                    .receivedByUserEmail(getCurrentUserEmail())
+                    .build();
+
+            eventPaymentRepository.save(initialPayment);
+        }
+
         log.info("Evento creado: {} para cliente: {}", savedEvent.getPublicId(), savedEvent.getCustomerName());
 
         return mapToResponse(savedEvent);
@@ -758,6 +794,7 @@ public class EventService {
                 .tenant(event.getTenant())
                 .branch(event.getBranch())
                 .amount(request.getAmount())
+                .eventPriceAtPayment(event.getEventPrice())
                 .paymentMethod(request.getPaymentMethod())
                 .reference(request.getReference())
                 .notes(request.getNotes())
@@ -797,12 +834,73 @@ public class EventService {
     }
 
     // =====================================================
+    // AUDITORÍA DE CONSISTENCIA
+    // =====================================================
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> auditEventPaymentConsistency() {
+        Long tenantId = TenantContext.getTenantId();
+
+        List<EventBooking> events = eventBookingRepository.findByTenant_Id(tenantId)
+                .stream()
+                .filter(e -> e.getDepositAmount().compareTo(BigDecimal.ZERO) > 0)
+                .toList();
+
+        List<Map<String, Object>> inconsistent = new java.util.ArrayList<>();
+
+        for (EventBooking event : events) {
+            BigDecimal paymentsSum = eventPaymentRepository
+                    .findByEventBooking_PublicIdAndTenant_IdOrderByPaidAtDesc(
+                            event.getPublicId(), tenantId)
+                    .stream()
+                    .map(EventPayment::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            BigDecimal difference = event.getDepositAmount().subtract(paymentsSum);
+
+            if (difference.compareTo(BigDecimal.ZERO) != 0) {
+                Map<String, Object> item = new java.util.LinkedHashMap<>();
+                item.put("eventPublicId", event.getPublicId());
+                item.put("eventNumber", String.format("EV-%06d", event.getEventNumber()));
+                item.put("depositAmount", event.getDepositAmount());
+                item.put("paymentsSum", paymentsSum);
+                item.put("difference", difference);
+                inconsistent.add(item);
+
+                log.warn("Inconsistencia financiera: evento {} depositAmount={} paymentsSum={} diff={}",
+                        event.getPublicId(), event.getDepositAmount(), paymentsSum, difference);
+            }
+        }
+
+        return inconsistent;
+    }
+
+    private String getCurrentUserPublicId() {
+        Long userId = TenantContext.getUserId();
+        if (userId != null) {
+            User user = userRepository.findById(userId).orElse(null);
+            if (user != null) return user.getPublicId();
+        }
+        return null;
+    }
+
+    private String getCurrentUserEmail() {
+        Long userId = TenantContext.getUserId();
+        if (userId != null) {
+            User user = userRepository.findById(userId).orElse(null);
+            if (user != null) return user.getEmail();
+        }
+        return null;
+    }
+
+    // =====================================================
     // MAPPERS
     // =====================================================
 
     private EventResponse mapToResponse(EventBooking event) {
         return EventResponse.builder()
                 .publicId(event.getPublicId())
+                .eventNumber(event.getEventNumber())
                 .customerName(event.getCustomerName())
                 .phone(event.getPhone())
                 .childName(event.getChildName())
@@ -827,6 +925,7 @@ public class EventService {
     private EventCalendarResponse mapToCalendarResponse(EventBooking event) {
         return EventCalendarResponse.builder()
                 .publicId(event.getPublicId())
+                .eventNumber(event.getEventNumber())
                 .customerName(event.getCustomerName())
                 .childName(event.getChildName())
                 .eventDate(event.getEventDate())

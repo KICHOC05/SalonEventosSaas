@@ -18,6 +18,7 @@ import java.time.LocalTime;
 @AllArgsConstructor
 public class EventCalendarResponse {
     private String publicId;
+    private Long eventNumber;
     private String customerName;
     private String childName;
     private LocalDate eventDate;

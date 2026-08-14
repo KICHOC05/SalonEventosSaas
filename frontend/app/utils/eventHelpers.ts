@@ -66,6 +66,10 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+export function formatEventNumber(eventNumber: number): string {
+  return `EV-${String(eventNumber).padStart(6, "0")}`;
+}
+
 export function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("es-MX", {
     year: "numeric",

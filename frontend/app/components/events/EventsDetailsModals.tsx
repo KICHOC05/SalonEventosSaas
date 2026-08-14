@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   fetchEventByPublicId, cancelEvent, updateEvent, checkEventAvailability,
   confirmEvent, startEvent, completeEvent,
-  fetchEventPayments, registerEventPayment,
+  fetchEventPayments, registerEventPayment, getEventTicket, getEventPaymentReceipt,
 } from "~/lib/api";
 import type {
   EventResponse, UpdateEventRequest,
@@ -13,10 +13,11 @@ import {
   Pencil, X, Check, Loader2, Calendar, AlertTriangle,
   Play, DollarSign, ChevronDown, ChevronUp,
   CheckCircle,
+  Printer,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  getStatusBadge, formatCurrency, formatDate, formatTime,
+  getStatusBadge, formatCurrency, formatDate, formatEventNumber, formatTime,
   canEdit, canConfirm, canStart, canComplete, canCancel,
 } from "~/utils/eventHelpers";
 import ConfirmCancelEventModal from "./ConfirmCancelEventModal";
@@ -61,6 +62,14 @@ export default function EventsDetailsModal({
   const [paymentFormNotes, setPaymentFormNotes] = useState("");
   const [paymentError, setPaymentError] = useState("");
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [paymentRefreshError, setPaymentRefreshError] = useState("");
+  const [ticketError, setTicketError] = useState("");
+  const [ticketLoading, setTicketLoading] = useState(false);
+  const [lastPaymentPublicId, setLastPaymentPublicId] = useState<string | null>(null);
+  const [receiptError, setReceiptError] = useState("");
+  const [receiptLoadingPaymentId, setReceiptLoadingPaymentId] = useState<string | null>(null);
+  const paymentSubmissionInFlight = useRef(false);
 
   // =====================================================
   // CARGAR EVENTO
@@ -201,6 +210,14 @@ export default function EventsDetailsModal({
     setPaymentFormReference("");
     setPaymentFormNotes("");
     setPaymentError("");
+    setPaymentSuccess(false);
+    setPaymentRefreshError("");
+    setTicketError("");
+    setTicketLoading(false);
+    setLastPaymentPublicId(null);
+    setReceiptError("");
+    setReceiptLoadingPaymentId(null);
+    paymentSubmissionInFlight.current = false;
     setLoading(false);
     onClose();
   };
@@ -325,6 +342,11 @@ export default function EventsDetailsModal({
 
   const handleRegisterPayment = async () => {
     setPaymentError("");
+    setPaymentRefreshError("");
+    setTicketError("");
+    setReceiptError("");
+    setLastPaymentPublicId(null);
+    if (paymentSubmissionInFlight.current) return;
     if (!event || paymentFormAmount <= 0) {
       setPaymentError("Ingresa un monto válido");
       return;
@@ -333,30 +355,102 @@ export default function EventsDetailsModal({
       setPaymentError("El monto no puede superar el saldo pendiente");
       return;
     }
+    paymentSubmissionInFlight.current = true;
     setPaymentSubmitting(true);
     try {
-      await registerEventPayment(event.publicId, {
+      const createdPayment = await registerEventPayment(event.publicId, {
         amount: paymentFormAmount,
         paymentMethod: paymentFormMethod,
         reference: paymentFormReference.trim() || undefined,
         notes: paymentFormNotes.trim() || undefined,
       });
-      toast.success("Pago registrado correctamente");
-      setShowPaymentForm(false);
-      setPaymentFormAmount(0);
-      setPaymentFormReference("");
-      setPaymentFormNotes("");
-      setPaymentError("");
-      const updated = await fetchEventByPublicId(event.publicId);
-      setEvent(updated);
-      await loadPayments();
-      onUpdated();
+      setLastPaymentPublicId(createdPayment.publicId);
     } catch (error: any) {
       const msg = error.message || "Error al registrar el pago";
       setPaymentError(msg);
       toast.error(msg);
+      return;
     } finally {
+      paymentSubmissionInFlight.current = false;
       setPaymentSubmitting(false);
+    }
+
+    setPaymentSuccess(true);
+    setShowPaymentForm(false);
+    setPaymentFormAmount(0);
+    setPaymentFormMethod("CASH");
+    setPaymentFormReference("");
+    setPaymentFormNotes("");
+    setPaymentError("");
+
+    try {
+      const updated = await fetchEventByPublicId(event.publicId);
+      setEvent(updated);
+    } catch {
+      setPaymentRefreshError(
+        "El pago fue registrado, pero no se pudieron actualizar los montos. Cierra y vuelve a abrir el evento para consultarlos."
+      );
+    }
+
+    await loadPayments();
+    onUpdated();
+  };
+
+  const handlePrintEventTicket = async () => {
+    if (!event || ticketLoading) return;
+    setTicketError("");
+    setTicketLoading(true);
+    try {
+      const html = await getEventTicket(event.publicId);
+      const win = window.open("", "_blank", "width=400,height=600");
+      if (win) {
+        win.onload = () => {
+          win.focus();
+          win.print();
+        };
+        win.document.open();
+        win.document.write(html);
+        win.document.close();
+      } else {
+        const message = "No se pudo abrir la ventana de impresión. Verifica que el navegador permita ventanas emergentes para este sitio.";
+        setTicketError(message);
+        toast.error(message);
+      }
+    } catch {
+      const message = "No se pudo cargar el ticket. Puedes intentar imprimirlo nuevamente.";
+      setTicketError(message);
+      toast.error(message);
+    } finally {
+      setTicketLoading(false);
+    }
+  };
+
+  const handlePrintPaymentReceipt = async (paymentPublicId: string) => {
+    if (!event || receiptLoadingPaymentId) return;
+    setReceiptError("");
+    setReceiptLoadingPaymentId(paymentPublicId);
+    try {
+      const html = await getEventPaymentReceipt(event.publicId, paymentPublicId);
+      const win = window.open("", "_blank", "width=400,height=600");
+      if (win) {
+        win.onload = () => {
+          win.focus();
+          win.print();
+        };
+        win.document.open();
+        win.document.write(html);
+        win.document.close();
+      } else {
+        const message = "No se pudo abrir la ventana de impresión. Verifica que el navegador permita ventanas emergentes para este sitio.";
+        setReceiptError(message);
+        toast.error(message);
+      }
+    } catch {
+      const message = "No se pudo cargar el recibo. Puedes intentar imprimirlo nuevamente.";
+      setReceiptError(message);
+      toast.error(message);
+    } finally {
+      setReceiptLoadingPaymentId(null);
     }
   };
 
@@ -459,7 +553,9 @@ export default function EventsDetailsModal({
                   {isEditing ? "Editar Evento" : event!.customerName}
                 </h3>
                 <p className="text-xs text-base-content/50">
-                  {isEditing ? "Modifica los datos del evento" : "Detalle de la reservación"}
+                  {isEditing
+                    ? "Modifica los datos del evento"
+                    : `${formatEventNumber(event!.eventNumber)} · Detalle de la reservación`}
                 </p>
               </div>
             </div>
@@ -813,7 +909,7 @@ export default function EventsDetailsModal({
                         {payments.map((p) => (
                           <div
                             key={p.publicId}
-                            className="flex items-center justify-between p-3 bg-base-200/50 rounded-xl"
+                            className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-base-200/50 rounded-xl"
                           >
                             <div>
                               <p className="text-sm font-medium">{formatCurrency(p.amount)}</p>
@@ -821,19 +917,134 @@ export default function EventsDetailsModal({
                                 {p.paymentMethod === "CASH" ? "Efectivo" : p.paymentMethod === "CARD" ? "Tarjeta" : "Transferencia"} &bull; {formatDate(p.paidAt)}
                               </p>
                             </div>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-xs gap-1 self-stretch sm:self-auto"
+                              onClick={() => handlePrintPaymentReceipt(p.publicId)}
+                              disabled={receiptLoadingPaymentId !== null}
+                            >
+                              {receiptLoadingPaymentId === p.publicId ? (
+                                <><Loader2 className="w-3 h-3 animate-spin" /> Cargando...</>
+                              ) : (
+                                <><Printer className="w-3 h-3" /> Imprimir recibo</>
+                              )}
+                            </button>
                           </div>
                         ))}
                       </div>
                     )}
 
-                    {!showPaymentForm ? (
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-sm w-full gap-2"
-                        onClick={() => setShowPaymentForm(true)}
-                      >
-                        <DollarSign className="w-4 h-4" /> Registrar pago
-                      </button>
+                    {paymentSuccess ? (
+                      <div className="bg-success/10 border border-success/20 rounded-xl p-4 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="w-5 h-5 text-success" />
+                          <span className="font-bold text-success text-sm">Pago registrado correctamente</span>
+                        </div>
+                        {!paymentRefreshError && event && event.remainingAmount <= 0 && (
+                          <div className="bg-success/20 rounded-lg px-3 py-2 text-center">
+                            <span className="font-extrabold text-success">EVENTO LIQUIDADO</span>
+                          </div>
+                        )}
+                        {paymentRefreshError ? (
+                          <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 text-xs text-warning">
+                            {paymentRefreshError}
+                          </div>
+                        ) : (
+                          <div className="space-y-1 text-sm">
+                            <div className="flex justify-between gap-4">
+                              <span className="text-base-content/60">Total pagado</span>
+                              <span className="font-bold">{event ? formatCurrency(event.depositAmount) : "—"}</span>
+                            </div>
+                            <div className="flex justify-between gap-4">
+                              <span className="text-base-content/60">Saldo restante</span>
+                              <span className={`font-bold ${event && event.remainingAmount <= 0 ? "text-success" : "text-warning"}`}>
+                                {event ? formatCurrency(event.remainingAmount) : "—"}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        {ticketError && (
+                          <div className="bg-error/10 border border-error/30 rounded-lg p-3 text-xs text-error">
+                            {ticketError}
+                          </div>
+                        )}
+                        {receiptError && (
+                          <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 text-xs text-warning">
+                            ⚠ {receiptError}
+                          </div>
+                        )}
+                        <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm flex-1 gap-1.5"
+                            onClick={() => lastPaymentPublicId && handlePrintPaymentReceipt(lastPaymentPublicId)}
+                            disabled={!lastPaymentPublicId || receiptLoadingPaymentId !== null}
+                          >
+                            {receiptLoadingPaymentId === lastPaymentPublicId ? (
+                              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Cargando recibo...</>
+                            ) : (
+                              <><Printer className="w-3.5 h-3.5" /> Imprimir recibo</>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm flex-1 gap-1.5"
+                            onClick={handlePrintEventTicket}
+                            disabled={ticketLoading}
+                          >
+                            {ticketLoading ? (
+                              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Cargando ticket...</>
+                            ) : (
+                              <><Printer className="w-3.5 h-3.5" /> Imprimir ticket completo</>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm flex-1"
+                            onClick={() => {
+                              setPaymentSuccess(false);
+                              setPaymentRefreshError("");
+                              setTicketError("");
+                              setReceiptError("");
+                              setLastPaymentPublicId(null);
+                            }}
+                          >
+                            Cerrar
+                          </button>
+                        </div>
+                      </div>
+                    ) : !showPaymentForm ? (
+                      <div className="space-y-2">
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm w-full gap-2"
+                          onClick={() => {
+                            setShowPaymentForm(true);
+                            setPaymentError("");
+                            setTicketError("");
+                            setReceiptError("");
+                          }}
+                        >
+                          <DollarSign className="w-4 h-4" /> Registrar pago
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm w-full gap-1.5"
+                          onClick={handlePrintEventTicket}
+                          disabled={ticketLoading}
+                        >
+                          {ticketLoading ? (
+                            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Cargando ticket...</>
+                          ) : (
+                            <><Printer className="w-3.5 h-3.5" /> Imprimir ticket</>
+                          )}
+                        </button>
+                        {ticketError && (
+                          <div className="bg-error/10 border border-error/30 rounded-lg p-3 text-xs text-error">
+                            {ticketError}
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <div className="p-3 bg-base-200 rounded-xl space-y-3">
                         <p className="text-xs font-semibold text-base-content/40 uppercase tracking-wider">

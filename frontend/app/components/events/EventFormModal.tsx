@@ -39,6 +39,9 @@ export default function EventFormModal({
     notes: "",
     packageProductPublicId: "",
     depositAmount: 0,
+    initialPaymentMethod: "CASH",
+    initialPaymentReference: "",
+    initialPaymentNotes: "",
   });
 
   const selectedPackage = packages.find((p) => p.publicId === form.packageProductPublicId);
@@ -156,6 +159,9 @@ export default function EventFormModal({
         notes: "",
         packageProductPublicId: packages.length > 0 ? packages[0].publicId : "",
         depositAmount: 0,
+        initialPaymentMethod: "CASH",
+        initialPaymentReference: "",
+        initialPaymentNotes: "",
       });
       onClose();
       onCreated();
@@ -360,9 +366,53 @@ export default function EventFormModal({
                         value={packagePrice > 0 ? Math.min((depositAmount / packagePrice) * 100, 100) : 0}
                         max="100"
                       />
-                      <p className="text-xs text-base-content/40 text-right">
+                       <p className="text-xs text-base-content/40 text-right">
                         {packagePrice > 0 ? Math.min((depositAmount / packagePrice) * 100, 100).toFixed(0) : 0}% pagado
                       </p>
+
+                      {depositAmount > 0 && (
+                        <div className="space-y-3 pt-2 border-t border-base-300/20">
+                          <h4 className="text-sm font-semibold text-base-content/40 uppercase tracking-wider">
+                            Pago inicial
+                          </h4>
+                          <div className="form-control">
+                            <label className="label py-1"><span className={labelCls}>Método de pago *</span></label>
+                            <select
+                              name="initialPaymentMethod"
+                              value={form.initialPaymentMethod || "CASH"}
+                              onChange={handleChange}
+                              className="select select-bordered w-full"
+                              required
+                            >
+                              <option value="CASH">Efectivo</option>
+                              <option value="CARD">Tarjeta</option>
+                              <option value="TRANSFER">Transferencia</option>
+                            </select>
+                          </div>
+                          <div className="form-control">
+                            <label className="label py-1"><span className={labelCls}>Referencia</span></label>
+                            <input
+                              type="text"
+                              name="initialPaymentReference"
+                              value={form.initialPaymentReference || ""}
+                              onChange={handleChange}
+                              className={inputCls}
+                              placeholder="Ej: SPEI-123456"
+                            />
+                          </div>
+                          <div className="form-control">
+                            <label className="label py-1"><span className={labelCls}>Notas del pago</span></label>
+                            <input
+                              type="text"
+                              name="initialPaymentNotes"
+                              value={form.initialPaymentNotes || ""}
+                              onChange={handleChange}
+                              className={inputCls}
+                              placeholder="Detalle adicional..."
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 

@@ -46,6 +46,9 @@ public class EventPayment {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;
 
+    @Column(name = "event_price_at_payment", precision = 10, scale = 2)
+    private BigDecimal eventPriceAtPayment;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method", nullable = false)
     private PaymentMethod paymentMethod;

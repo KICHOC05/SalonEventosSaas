@@ -14,6 +14,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
+import com.example.demo.common.enums.PaymentMethod;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -56,4 +58,8 @@ public class CreateEventRequest {
     @NotNull(message = "El monto del anticipo es obligatorio")
     @PositiveOrZero(message = "El anticipo debe ser mayor o igual a 0")
     private BigDecimal depositAmount;
+
+    private PaymentMethod initialPaymentMethod;
+    private String initialPaymentReference;
+    private String initialPaymentNotes;
 }

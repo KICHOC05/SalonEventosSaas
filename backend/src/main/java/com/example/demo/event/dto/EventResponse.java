@@ -21,6 +21,7 @@ import java.time.LocalTime;
 public class EventResponse {
 
     private String publicId;
+    private Long eventNumber;
     private String customerName;
     private String phone;
     private String childName;

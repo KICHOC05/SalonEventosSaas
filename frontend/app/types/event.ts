@@ -11,6 +11,7 @@ export type EventStatus =
 
 export interface EventCalendarResponse {
   publicId: string;
+  eventNumber: number;
   customerName: string;
   childName: string;
   eventDate: string;
@@ -21,6 +22,7 @@ export interface EventCalendarResponse {
 
 export interface EventResponse {
   publicId: string;
+  eventNumber: number;
   customerName: string;
   phone: string;
   childName: string;
@@ -58,6 +60,9 @@ export interface CreateEventRequest {
   notes?: string;
   packageProductPublicId: string;
   depositAmount: number;
+  initialPaymentMethod?: EventPaymentMethod;
+  initialPaymentReference?: string;
+  initialPaymentNotes?: string;
 }
 
 export interface UpdateEventRequest {

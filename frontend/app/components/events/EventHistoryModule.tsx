@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Search, X, Eye, Calendar, Clock, User, Baby } from "lucide-react";
 import type { EventResponse, EventStatus } from "~/types/event";
-import { getStatusBadge, formatCurrency, formatTime, formatShortDate } from "~/utils/eventHelpers";
+import { getStatusBadge, formatCurrency, formatEventNumber, formatTime, formatShortDate } from "~/utils/eventHelpers";
 
 interface EventHistoryModuleProps {
   events: EventResponse[];
@@ -163,6 +163,7 @@ export default function EventHistoryModule({ events, loading, onViewDetails }: E
             <table className="table">
               <thead>
                 <tr className="text-[11px] uppercase text-base-content/40">
+                  <th>Evento</th>
                   <th>Fecha</th>
                   <th>Horario</th>
                   <th>Cliente</th>
@@ -183,6 +184,9 @@ export default function EventHistoryModule({ events, loading, onViewDetails }: E
                   const paymentInfo = getPaymentLabel(paymentStatus);
                   return (
                     <tr key={event.publicId} className="hover:bg-base-200/30 transition-colors">
+                      <td className="font-mono text-xs font-bold text-primary whitespace-nowrap">
+                        {formatEventNumber(event.eventNumber)}
+                      </td>
                       <td className="text-sm font-medium whitespace-nowrap">
                         {formatShortDate(event.eventDate)}
                       </td>

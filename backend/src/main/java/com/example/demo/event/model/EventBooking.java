@@ -20,7 +20,13 @@ import java.time.LocalTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "event_bookings")
+@Table(
+        name = "event_bookings",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_event_booking_branch_number",
+                columnNames = {"tenant_id", "branch_id", "event_number"}
+        )
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -42,6 +48,11 @@ public class EventBooking {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "branch_id", nullable = false)
     private Branch branch;
+
+    // Nullable únicamente para permitir el backfill seguro de eventos históricos.
+    // Todos los eventos nuevos reciben el valor antes de persistirse.
+    @Column(name = "event_number")
+    private Long eventNumber;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "package_product_id", nullable = false)

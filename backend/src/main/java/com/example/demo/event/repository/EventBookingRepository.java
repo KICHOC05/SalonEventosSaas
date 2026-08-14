@@ -19,7 +19,16 @@ public interface EventBookingRepository extends JpaRepository<EventBooking, Long
 
     Optional<EventBooking> findByPublicId(String publicId);
 
+    Optional<EventBooking> findByPublicIdAndTenant_Id(String publicId, Long tenantId);
+
     List<EventBooking> findByTenant_Id(Long tenantId);
+
+    @Query("""
+        SELECT event
+        FROM EventBooking event
+        ORDER BY event.tenant.id, event.branch.id, event.createdAt, event.id
+    """)
+    List<EventBooking> findAllForEventNumberMigration();
 
     List<EventBooking> findByTenant_IdAndEventDateBetweenOrderByEventDateAscStartTimeAsc(
             Long tenantId,
