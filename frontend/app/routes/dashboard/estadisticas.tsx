@@ -47,6 +47,7 @@ function MiniStatCard({
     iconColor,
     bgColor,
     valueColor,
+    detail,
 }: {
     label: string;
     value: string;
@@ -54,6 +55,7 @@ function MiniStatCard({
     iconColor: string;
     bgColor: string;
     valueColor?: string;
+    detail?: string;
 }) {
     return (
         <div className="card bg-base-100 shadow-sm border border-base-300/30 hover:shadow-md transition-shadow">
@@ -67,6 +69,11 @@ function MiniStatCard({
                             {label}
                         </p>
                         <p className={`text-xl font-extrabold tracking-tight ${valueColor ?? ""}`}>{value}</p>
+                        {detail && (
+                            <p className="text-[10px] text-base-content/40 mt-0.5 truncate" title={detail}>
+                                {detail}
+                            </p>
+                        )}
                     </div>
                 </div>
             </div>
@@ -154,7 +161,11 @@ export default function Estadisticas() {
 
             if (result) {
                 result.totalSales = toNumber(result.totalSales);
+                result.posSales = toNumber(result.posSales);
+                result.eventSales = toNumber(result.eventSales);
                 result.totalOrders = toNumber(result.totalOrders);
+                result.paidEvents = toNumber(result.paidEvents);
+                result.totalTransactions = toNumber(result.totalTransactions);
                 result.averageTicket = toNumber(result.averageTicket);
                 result.growthPercentage = toNumber(result.growthPercentage);
 
@@ -389,6 +400,7 @@ export default function Estadisticas() {
                         icon={DollarSign}
                         iconColor="text-cyan-500"
                         bgColor="bg-cyan-500/10"
+                        detail={`POS ${formatCurrency(data.posSales)} · Eventos ${formatCurrency(data.eventSales)}`}
                     />
                     <MiniStatCard
                         label="Órdenes cerradas"
@@ -396,13 +408,15 @@ export default function Estadisticas() {
                         icon={ShoppingCart}
                         iconColor="text-violet-500"
                         bgColor="bg-violet-500/10"
+                        detail={`${data.paidEvents} eventos con pago`}
                     />
                     <MiniStatCard
-                        label="Ticket promedio"
+                        label="Ticket promedio combinado"
                         value={formatCurrency(data.averageTicket)}
                         icon={Receipt}
                         iconColor="text-pink-500"
                         bgColor="bg-pink-500/10"
+                        detail={`${data.totalTransactions} operaciones contabilizadas`}
                     />
                     <MiniStatCard
                         label="Crecimiento"

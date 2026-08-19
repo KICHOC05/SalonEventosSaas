@@ -21,9 +21,13 @@ public class StatsResponse {
     private List<TopItemDTO> topProducts;
 
     private BigDecimal totalSales;
+    private BigDecimal posSales;
+    private BigDecimal eventSales;
     private BigDecimal averageTicket;
     private Double growthPercentage;
     private Long totalOrders;
+    private Long paidEvents;
+    private Long totalTransactions;
 
     private Integer scheduledEvents;
 

@@ -1344,9 +1344,13 @@ export interface DashboardData {
     salesToday: number;
     salesYesterday: number;
     salesTodayGrowth: number;
+    posSalesToday: number;
+    eventSalesToday: number;
     monthlyRevenue: number;
     previousMonthRevenue: number;
     monthlyGrowth: number;
+    posMonthlyRevenue: number;
+    eventMonthlyRevenue: number;
     inventory: InventorySummary;
     salesChart: SalesChartData;
     topPackages: TopItem[];
@@ -1369,9 +1373,13 @@ export interface StatsData {
     salesByPackage: TopItem[];
     topProducts: TopItem[];
     totalSales: number;
+    posSales: number;
+    eventSales: number;
     averageTicket: number;
     growthPercentage: number;
     totalOrders: number;
+    paidEvents: number;
+    totalTransactions: number;
     scheduledEvents: number;
     paymentBreakdown: PaymentBreakdownData;
 }

@@ -13,10 +13,14 @@ public class DashboardResponse {
     private BigDecimal salesToday;
     private BigDecimal salesYesterday;
     private Double salesTodayGrowth;
+    private BigDecimal posSalesToday;
+    private BigDecimal eventSalesToday;
 
     private BigDecimal monthlyRevenue;
     private BigDecimal previousMonthRevenue;
     private Double monthlyGrowth;
+    private BigDecimal posMonthlyRevenue;
+    private BigDecimal eventMonthlyRevenue;
 
     private InventorySummary inventory;
     private SalesChartDTO salesChart;

@@ -170,9 +170,13 @@ export default function Dashboard() {
         result.salesToday = toNumber(result.salesToday);
         result.salesYesterday = toNumber(result.salesYesterday);
         result.salesTodayGrowth = toNumber(result.salesTodayGrowth);
+        result.posSalesToday = toNumber(result.posSalesToday);
+        result.eventSalesToday = toNumber(result.eventSalesToday);
         result.monthlyRevenue = toNumber(result.monthlyRevenue);
         result.previousMonthRevenue = toNumber(result.previousMonthRevenue);
         result.monthlyGrowth = toNumber(result.monthlyGrowth);
+        result.posMonthlyRevenue = toNumber(result.posMonthlyRevenue);
+        result.eventMonthlyRevenue = toNumber(result.eventMonthlyRevenue);
         result.scheduledEventsCount = toNumber(result.scheduledEventsCount);
 
         if (result.salesChart?.data) {
@@ -311,7 +315,14 @@ export default function Dashboard() {
             icon={DollarSign}
             gradient="bg-gradient-to-br from-cyan-500 to-blue-600"
             delay={0}
-            footer={<GrowthBadge value={data.salesTodayGrowth} label="vs. ayer" />}
+            footer={
+              <div className="space-y-1.5">
+                <GrowthBadge value={data.salesTodayGrowth} label="vs. ayer" />
+                <p className="text-base-content/40">
+                  POS {formatCurrency(data.posSalesToday)} · Eventos {formatCurrency(data.eventSalesToday)}
+                </p>
+              </div>
+            }
           />
           <StatCard
             title="Eventos programados"
@@ -327,7 +338,14 @@ export default function Dashboard() {
             icon={TrendingUp}
             gradient="bg-gradient-to-br from-emerald-500 to-teal-600"
             delay={150}
-            footer={<GrowthBadge value={data.monthlyGrowth} label="vs. mes anterior" />}
+            footer={
+              <div className="space-y-1.5">
+                <GrowthBadge value={data.monthlyGrowth} label="vs. mes anterior" />
+                <p className="text-base-content/40">
+                  POS {formatCurrency(data.posMonthlyRevenue)} · Eventos {formatCurrency(data.eventMonthlyRevenue)}
+                </p>
+              </div>
+            }
           />
           <StatCard
             title="Productos en inventario"

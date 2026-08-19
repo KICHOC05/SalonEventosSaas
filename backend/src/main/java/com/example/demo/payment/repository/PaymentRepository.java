@@ -88,6 +88,18 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     @Query("""
                 SELECT COALESCE(SUM(p.amount), 0)
                 FROM Payment p
+                WHERE p.tenant.id = :tenantId
+                  AND p.createdAt >= :startInclusive
+                  AND p.createdAt < :endExclusive
+            """)
+    BigDecimal sumTotalPaymentsByTenantInPeriod(
+            @Param("tenantId") Long tenantId,
+            @Param("startInclusive") LocalDateTime startInclusive,
+            @Param("endExclusive") LocalDateTime endExclusive);
+
+    @Query("""
+                SELECT COALESCE(SUM(p.amount), 0)
+                FROM Payment p
                 WHERE p.branch.id = :branchId
                   AND p.paymentMethod = com.example.demo.common.enums.PaymentMethod.CASH
                   AND p.createdAt BETWEEN :start AND :end
@@ -135,6 +147,21 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end);
 
+    @Query(value = """
+                SELECT DATE(p.created_at) as sale_date,
+                       COALESCE(SUM(p.amount), 0) as total
+                FROM payments p
+                WHERE p.tenant_id = :tenantId
+                  AND p.created_at >= :startInclusive
+                  AND p.created_at < :endExclusive
+                GROUP BY DATE(p.created_at)
+                ORDER BY DATE(p.created_at)
+            """, nativeQuery = true)
+    List<Object[]> dailySalesByTenantInPeriod(
+            @Param("tenantId") Long tenantId,
+            @Param("startInclusive") LocalDateTime startInclusive,
+            @Param("endExclusive") LocalDateTime endExclusive);
+
     // PaymentRepository.java - Cambiar el retorno de la query
     @Query(value = """
                 SELECT
@@ -149,4 +176,19 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             @Param("tenantId") Long tenantId,
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end);
+
+    @Query(value = """
+                SELECT
+                    COALESCE(SUM(CASE WHEN p.payment_method = 'CASH' THEN p.amount ELSE 0 END), 0) as cash_total,
+                    COALESCE(SUM(CASE WHEN p.payment_method = 'CARD' THEN p.amount ELSE 0 END), 0) as card_total,
+                    COALESCE(SUM(CASE WHEN p.payment_method = 'TRANSFER' THEN p.amount ELSE 0 END), 0) as transfer_total
+                FROM payments p
+                WHERE p.tenant_id = :tenantId
+                  AND p.created_at >= :startInclusive
+                  AND p.created_at < :endExclusive
+            """, nativeQuery = true)
+    List<Object[]> paymentBreakdownByTenantInPeriod(
+            @Param("tenantId") Long tenantId,
+            @Param("startInclusive") LocalDateTime startInclusive,
+            @Param("endExclusive") LocalDateTime endExclusive);
 }

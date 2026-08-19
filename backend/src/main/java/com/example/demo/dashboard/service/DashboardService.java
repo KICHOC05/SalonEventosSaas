@@ -8,15 +8,14 @@ import com.example.demo.dashboard.dto.DashboardResponse.UpcomingEventDTO;
 import com.example.demo.dashboard.dto.StatsResponse.PaymentBreakdown;
 import com.example.demo.event.model.EventBooking;
 import com.example.demo.event.repository.EventBookingRepository;
+import com.example.demo.event.repository.EventPaymentRepository;
 import com.example.demo.order.repository.OrderItemRepository;
 import com.example.demo.order.repository.OrderRepository;
-import com.example.demo.payment.repository.PaymentRepository;
 import com.example.demo.product.model.Product;
 import com.example.demo.product.repository.ProductRepository;
 import com.example.demo.security.TenantContext;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -24,22 +23,21 @@ import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DashboardService {
 
-        private final PaymentRepository paymentRepository;
+        private final SalesAggregationService salesAggregationService;
         private final OrderRepository orderRepository;
         private final OrderItemRepository orderItemRepository;
         private final ProductRepository productRepository;
         private final EventBookingRepository eventBookingRepository;
+        private final EventPaymentRepository eventPaymentRepository;
 
         private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         private static final int LOW_STOCK_THRESHOLD = 5;
@@ -55,37 +53,42 @@ public class DashboardService {
                 LocalDate today = LocalDate.now();
 
                 LocalDateTime startOfDay = today.atStartOfDay();
-                LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
+                LocalDateTime endExclusive = today.plusDays(1).atStartOfDay();
+                LocalDateTime endOfDay = endExclusive.minusNanos(1);
 
                 LocalDate yesterday = today.minusDays(1);
                 LocalDateTime startYesterday = yesterday.atStartOfDay();
-                LocalDateTime endYesterday = yesterday.atTime(LocalTime.MAX);
 
                 LocalDate firstDayOfMonth = today.withDayOfMonth(1);
                 LocalDateTime startOfMonth = firstDayOfMonth.atStartOfDay();
 
                 LocalDate firstDayPrevMonth = firstDayOfMonth.minusMonths(1);
                 LocalDateTime startPrevMonth = firstDayPrevMonth.atStartOfDay();
-                LocalDateTime endPrevMonth = firstDayOfMonth.minusDays(1).atTime(LocalTime.MAX);
 
-                BigDecimal salesToday = safe(paymentRepository.sumTotalPaymentsByTenant(
-                                tenantId, startOfDay, endOfDay));
-                BigDecimal salesYesterday = safe(paymentRepository.sumTotalPaymentsByTenant(
-                                tenantId, startYesterday, endYesterday));
+                SalesAggregationService.SourceTotals todaySales = salesAggregationService.totals(
+                                tenantId, startOfDay, endExclusive);
+                SalesAggregationService.SourceTotals yesterdaySales = salesAggregationService.totals(
+                                tenantId, startYesterday, startOfDay);
+                BigDecimal salesToday = todaySales.total();
+                BigDecimal salesYesterday = yesterdaySales.total();
                 Double salesTodayGrowth = calculateGrowth(salesToday, salesYesterday);
 
-                BigDecimal monthlyRevenue = safe(paymentRepository.sumTotalPaymentsByTenant(
-                                tenantId, startOfMonth, endOfDay));
-                BigDecimal prevMonthRevenue = safe(paymentRepository.sumTotalPaymentsByTenant(
-                                tenantId, startPrevMonth, endPrevMonth));
+                SalesAggregationService.SourceTotals monthSales = salesAggregationService.totals(
+                                tenantId, startOfMonth, endExclusive);
+                SalesAggregationService.SourceTotals previousMonthSales = salesAggregationService.totals(
+                                tenantId, startPrevMonth, startOfMonth);
+                BigDecimal monthlyRevenue = monthSales.total();
+                BigDecimal prevMonthRevenue = previousMonthSales.total();
                 Double monthlyGrowth = calculateGrowth(monthlyRevenue, prevMonthRevenue);
 
                 InventorySummary inventory = buildInventorySummary(tenantId);
 
                 SalesChartDTO salesChart = buildSalesChart(tenantId, 7);
 
-                List<TopItemDTO> topPackages = buildTopItems(
+                List<TopItemDTO> topPackages = mergeTopItems(
                                 orderItemRepository.topPackagesByTenant(tenantId, startOfMonth, endOfDay),
+                                eventPaymentRepository.paidPackagesByTenantInPeriod(
+                                                tenantId, startOfMonth, endExclusive),
                                 5);
 
                 List<EventBooking> upcomingBookings = eventBookingRepository
@@ -106,9 +109,13 @@ public class DashboardService {
                                 .salesToday(salesToday)
                                 .salesYesterday(salesYesterday)
                                 .salesTodayGrowth(salesTodayGrowth)
+                                .posSalesToday(todaySales.pos())
+                                .eventSalesToday(todaySales.events())
                                 .monthlyRevenue(monthlyRevenue)
                                 .previousMonthRevenue(prevMonthRevenue)
                                 .monthlyGrowth(monthlyGrowth)
+                                .posMonthlyRevenue(monthSales.pos())
+                                .eventMonthlyRevenue(monthSales.events())
                                 .inventory(inventory)
                                 .salesChart(salesChart)
                                 .topPackages(topPackages)
@@ -125,27 +132,34 @@ public class DashboardService {
                         rangeDays = 7;
 
                 LocalDate today = LocalDate.now();
-                LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
+                LocalDateTime endExclusive = today.plusDays(1).atStartOfDay();
+                LocalDateTime endOfDay = endExclusive.minusNanos(1);
                 LocalDate startDate = today.minusDays(rangeDays - 1);
                 LocalDateTime start = startDate.atStartOfDay();
 
                 LocalDate prevStartDate = startDate.minusDays(rangeDays);
                 LocalDateTime prevStart = prevStartDate.atStartOfDay();
-                LocalDateTime prevEnd = startDate.minusDays(1).atTime(LocalTime.MAX);
 
-                BigDecimal totalSales = safe(paymentRepository.sumTotalPaymentsByTenant(
-                                tenantId, start, endOfDay));
-                BigDecimal prevTotalSales = safe(paymentRepository.sumTotalPaymentsByTenant(
-                                tenantId, prevStart, prevEnd));
+                SalesAggregationService.SourceTotals periodSales = salesAggregationService.totals(
+                                tenantId, start, endExclusive);
+                SalesAggregationService.SourceTotals previousPeriodSales = salesAggregationService.totals(
+                                tenantId, prevStart, start);
+                BigDecimal totalSales = periodSales.total();
+                BigDecimal prevTotalSales = previousPeriodSales.total();
                 Double growthPercentage = calculateGrowth(totalSales, prevTotalSales);
 
                 Long totalOrders = orderRepository.countClosedOrdersByTenant(tenantId, start, endOfDay);
                 if (totalOrders == null)
                         totalOrders = 0L;
 
+                long paidEvents = salesAggregationService.countPaidEvents(
+                                tenantId, start, endExclusive);
+                long totalTransactions = totalOrders + paidEvents;
+
                 BigDecimal averageTicket = BigDecimal.ZERO;
-                if (totalOrders > 0) {
-                        averageTicket = totalSales.divide(BigDecimal.valueOf(totalOrders), 2, RoundingMode.HALF_UP);
+                if (totalTransactions > 0) {
+                        averageTicket = totalSales.divide(
+                                        BigDecimal.valueOf(totalTransactions), 2, RoundingMode.HALF_UP);
                 }
 
                 SalesChartDTO dailySales = buildSalesChart(tenantId, rangeDays);
@@ -153,13 +167,16 @@ public class DashboardService {
                 List<TopItemDTO> salesByProduct = buildTopItems(
                                 orderItemRepository.topProductsByTenant(tenantId, start, endOfDay), null);
 
-                List<TopItemDTO> salesByPackage = buildTopItems(
-                                eventBookingRepository.topEventPackagesByTenant(tenantId, start, endOfDay), null);
+                List<TopItemDTO> salesByPackage = mergeTopItems(
+                                orderItemRepository.topPackagesByTenant(tenantId, start, endOfDay),
+                                eventPaymentRepository.paidPackagesByTenantInPeriod(
+                                                tenantId, start, endExclusive),
+                                null);
 
                 List<TopItemDTO> topProducts = buildTopItems(
                                 orderItemRepository.allItemsSoldByTenant(tenantId, start, endOfDay), 10);
 
-                PaymentBreakdown paymentBreakdown = buildPaymentBreakdown(tenantId, start, endOfDay);
+                PaymentBreakdown paymentBreakdown = buildPaymentBreakdown(tenantId, start, endExclusive);
 
                 return StatsResponse.builder()
                                 .rangeDays(rangeDays)
@@ -170,10 +187,16 @@ public class DashboardService {
                                 .salesByPackage(salesByPackage)
                                 .topProducts(topProducts)
                                 .totalSales(totalSales)
+                                .posSales(periodSales.pos())
+                                .eventSales(periodSales.events())
                                 .averageTicket(averageTicket)
                                 .growthPercentage(growthPercentage)
                                 .totalOrders(totalOrders)
-                                .scheduledEvents(0)
+                                .paidEvents(paidEvents)
+                                .totalTransactions(totalTransactions)
+                                .scheduledEvents(Math.toIntExact(safeLong(
+                                                eventBookingRepository.countScheduledByTenantAndEventDateBetween(
+                                                                tenantId, startDate, today))))
                                 .paymentBreakdown(paymentBreakdown)
                                 .build();
         }
@@ -251,16 +274,10 @@ public class DashboardService {
                 LocalDate today = LocalDate.now();
                 LocalDate startDate = today.minusDays(days - 1);
                 LocalDateTime start = startDate.atStartOfDay();
-                LocalDateTime end = today.atTime(LocalTime.MAX);
+                LocalDateTime endExclusive = today.plusDays(1).atStartOfDay();
 
-                List<Object[]> raw = paymentRepository.dailySalesByTenant(tenantId, start, end);
-
-                Map<LocalDate, BigDecimal> salesMap = new LinkedHashMap<>();
-                for (Object[] row : raw) {
-                        LocalDate date = parseDate(row[0]);
-                        BigDecimal amount = toBigDecimal(row[1]);
-                        salesMap.put(date, amount);
-                }
+                Map<LocalDate, BigDecimal> salesMap = salesAggregationService.dailyTotals(
+                                tenantId, start, endExclusive);
 
                 List<String> labels = new ArrayList<>();
                 List<BigDecimal> data = new ArrayList<>();
@@ -312,41 +329,68 @@ public class DashboardService {
                 return items;
         }
 
+        private List<TopItemDTO> mergeTopItems(
+                        List<Object[]> firstSource,
+                        List<Object[]> secondSource,
+                        Integer limit) {
+
+                Map<String, TopItemDTO> merged = new LinkedHashMap<>();
+                mergeTopItemRows(merged, firstSource);
+                mergeTopItemRows(merged, secondSource);
+
+                List<TopItemDTO> items = new ArrayList<>(merged.values());
+                items.sort(Comparator
+                                .comparing(TopItemDTO::getQuantitySold, Comparator.reverseOrder())
+                                .thenComparing(TopItemDTO::getTotalRevenue, Comparator.reverseOrder())
+                                .thenComparing(TopItemDTO::getName));
+
+                if (limit != null && items.size() > limit) {
+                        return items.subList(0, limit);
+                }
+                return items;
+        }
+
+        private void mergeTopItemRows(Map<String, TopItemDTO> merged, List<Object[]> rows) {
+                if (rows == null) {
+                        return;
+                }
+
+                for (Object[] row : rows) {
+                        String publicId = (String) row[0];
+                        String name = (String) row[1];
+                        long quantity = ((Number) row[2]).longValue();
+                        BigDecimal revenue = toBigDecimal(row[3]);
+
+                        merged.compute(publicId, (key, current) -> {
+                                if (current == null) {
+                                        return TopItemDTO.builder()
+                                                        .publicId(publicId)
+                                                        .name(name)
+                                                        .quantitySold(quantity)
+                                                        .totalRevenue(revenue)
+                                                        .build();
+                                }
+                                current.setQuantitySold(current.getQuantitySold() + quantity);
+                                current.setTotalRevenue(current.getTotalRevenue().add(revenue));
+                                return current;
+                        });
+                }
+        }
+
         private PaymentBreakdown buildPaymentBreakdown(
                         Long tenantId, LocalDateTime start, LocalDateTime end) {
 
-                try {
-                        List<Object[]> results = paymentRepository.paymentBreakdownByTenant(
-                                        tenantId, start, end);
-
-                        if (results != null && !results.isEmpty()) {
-                                Object[] row = results.get(0);
-
-                                return PaymentBreakdown.builder()
-                                                .cashTotal(toBigDecimal(row[0]))
-                                                .cardTotal(toBigDecimal(row[1]))
-                                                .transferTotal(toBigDecimal(row[2]))
-                                                .build();
-                        }
-                } catch (Exception e) {
-                        log.warn("Error al obtener desglose de pagos: {}", e.getMessage(), e);
-                }
-
+                SalesAggregationService.PaymentMethodTotals totals =
+                                salesAggregationService.paymentMethodTotals(tenantId, start, end);
                 return PaymentBreakdown.builder()
-                                .cashTotal(BigDecimal.ZERO)
-                                .cardTotal(BigDecimal.ZERO)
-                                .transferTotal(BigDecimal.ZERO)
+                                .cashTotal(totals.cash())
+                                .cardTotal(totals.card())
+                                .transferTotal(totals.transfer())
                                 .build();
         }
 
-        private LocalDate parseDate(Object value) {
-                if (value instanceof LocalDate)
-                        return (LocalDate) value;
-                if (value instanceof java.sql.Date)
-                        return ((java.sql.Date) value).toLocalDate();
-                if (value instanceof java.sql.Timestamp)
-                        return ((java.sql.Timestamp) value).toLocalDateTime().toLocalDate();
-                return LocalDate.parse(value.toString());
+        private long safeLong(Long value) {
+                return value != null ? value : 0L;
         }
 
         private BigDecimal toBigDecimal(Object value) {

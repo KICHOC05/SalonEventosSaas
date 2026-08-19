@@ -142,4 +142,16 @@ public interface EventBookingRepository extends JpaRepository<EventBooking, Long
             @Param("tenantId") Long tenantId,
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end);
+
+    @Query("""
+        SELECT COUNT(eb)
+        FROM EventBooking eb
+        WHERE eb.tenant.id = :tenantId
+          AND eb.eventDate BETWEEN :from AND :to
+          AND eb.status <> com.example.demo.common.enums.EventStatus.CANCELLED
+    """)
+    Long countScheduledByTenantAndEventDateBetween(
+            @Param("tenantId") Long tenantId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
 }
