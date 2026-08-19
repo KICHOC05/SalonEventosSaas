@@ -14,7 +14,11 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "orders")
+@Table(name = "orders", indexes = {
+        @Index(name = "idx_orders_tenant_branch_created", columnList = "tenant_id,branch_id,created_at"),
+        @Index(name = "idx_orders_tenant_status_created", columnList = "tenant_id,status,created_at"),
+        @Index(name = "idx_orders_tenant_user_created", columnList = "tenant_id,user_id,created_at")
+})
 @Getter
 @Setter
 public class Order {

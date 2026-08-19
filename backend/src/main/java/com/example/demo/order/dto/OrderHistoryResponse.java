@@ -16,6 +16,10 @@ public class OrderHistoryResponse {
     private LocalDateTime closedAt;
     private String customerName;
     private String sellerName;
+    private String sellerPublicId;
+    private String sellerEmail;
+    private String branchPublicId;
+    private String branchName;
     private String status;
     private BigDecimal totalAmount;
     private List<String> paymentMethods;

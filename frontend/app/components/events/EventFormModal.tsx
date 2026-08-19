@@ -198,6 +198,7 @@ export default function EventFormModal({
 
   const inputCls = "input input-bordered w-full";
   const inputErrCls = "input input-bordered w-full input-error";
+  const numberInputCls = `${inputCls} [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`;
   const labelCls = "label-text font-medium";
 
   return (
@@ -260,15 +261,43 @@ export default function EventFormModal({
                       </div>
                       <div className="form-control">
                         <label className="label py-1"><span className={labelCls}>Edad</span></label>
-                        <input type="number" name="childAge" value={form.childAge} onChange={handleChange} className={inputCls} min="0" max="18" />
+                        <input
+                          type="number"
+                          name="childAge"
+                          value={form.childAge}
+                          onChange={handleChange}
+                          onFocus={(event) => event.currentTarget.select()}
+                          className={numberInputCls}
+                          inputMode="numeric"
+                          min="0"
+                          max="18"
+                        />
                       </div>
                       <div className="form-control">
                         <label className="label py-1"><span className={labelCls}>Ni&ntilde;os invitados</span></label>
-                        <input type="number" name="guestChildren" value={form.guestChildren} onChange={handleChange} className={inputCls} min="0" />
+                        <input
+                          type="number"
+                          name="guestChildren"
+                          value={form.guestChildren === 0 ? "" : form.guestChildren}
+                          onChange={handleChange}
+                          className={numberInputCls}
+                          inputMode="numeric"
+                          placeholder="0"
+                          min="0"
+                        />
                       </div>
                       <div className="form-control">
                         <label className="label py-1"><span className={labelCls}>Adultos invitados</span></label>
-                        <input type="number" name="guestAdults" value={form.guestAdults} onChange={handleChange} className={inputCls} min="0" />
+                        <input
+                          type="number"
+                          name="guestAdults"
+                          value={form.guestAdults === 0 ? "" : form.guestAdults}
+                          onChange={handleChange}
+                          className={numberInputCls}
+                          inputMode="numeric"
+                          placeholder="0"
+                          min="0"
+                        />
                       </div>
                       <div className="form-control sm:col-span-2">
                         <label className="label py-1"><span className={labelCls}>Notas</span></label>
@@ -345,9 +374,11 @@ export default function EventFormModal({
                         <input
                           type="number"
                           name="depositAmount"
-                          value={form.depositAmount}
+                          value={form.depositAmount === 0 ? "" : form.depositAmount}
                           onChange={handleChange}
-                          className={`${inputCls} ${!isDepositValid ? "input-error" : ""}`}
+                          className={`${numberInputCls} ${!isDepositValid ? "input-error" : ""}`}
+                          inputMode="decimal"
+                          placeholder="0.00"
                           min="0"
                           step="0.01"
                         />

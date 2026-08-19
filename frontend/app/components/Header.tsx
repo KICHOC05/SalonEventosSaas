@@ -9,7 +9,6 @@ import {
   Gift,
   Calendar,
   Images,
-  Star,
   Phone,
 } from "lucide-react";
 import { ThemeToggle } from "~/components/ThemeToggle";
@@ -46,12 +45,6 @@ const navLinks = [
     Icon: Images,
     color: "text-cyan-400",
     isRoute: true,
-  },
-  {
-    href: "#resenas",
-    label: "Reseñas",
-    Icon: Star,
-    color: "text-yellow-400",
   },
   {
     href: "#contacto",

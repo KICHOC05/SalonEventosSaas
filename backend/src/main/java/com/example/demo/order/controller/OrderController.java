@@ -6,6 +6,7 @@ import com.example.demo.order.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import com.example.demo.common.enums.PaymentMethod;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -82,11 +83,15 @@ public class OrderController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) String orderNumber,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) PaymentMethod paymentMethod,
+            @RequestParam(required = false) String userPublicId,
+            @RequestParam(required = false) String branchPublicId,
             @RequestParam(required = false) String createdAtFrom,
             @RequestParam(required = false) String createdAtTo) {
 
-        return orderService.getOrderHistory(page, size, search, status,
-                createdAtFrom, createdAtTo);
+        return orderService.getOrderHistory(page, size, search, orderNumber, status,
+                paymentMethod, userPublicId, branchPublicId, createdAtFrom, createdAtTo);
     }
 }

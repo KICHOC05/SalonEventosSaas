@@ -31,7 +31,13 @@ public class CashRegisterDetailResponse {
     private LocalDateTime openedAt;
     private LocalDateTime closedAt;
     private String openedByName;
+    private String openedByPublicId;
+    private String openedByEmail;
     private String closedByName;
+    private String closedByPublicId;
+    private String closedByEmail;
+    private String branchPublicId;
+    private String branchName;
     private long orderCount;
     private int movementCount;
 }

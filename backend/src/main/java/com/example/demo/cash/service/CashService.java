@@ -10,6 +10,7 @@ import com.example.demo.common.enums.CashStatus;
 import com.example.demo.common.enums.PaymentMethod;
 import com.example.demo.event.repository.EventPaymentRepository;
 import com.example.demo.payment.repository.PaymentRepository;
+import com.example.demo.order.repository.OrderRepository;
 import com.example.demo.security.TenantContext;
 import com.example.demo.branch.model.Branch;
 import com.example.demo.branch.repository.BranchRepository;
@@ -23,12 +24,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -39,6 +43,7 @@ public class CashService {
     private final CashMovementRepository cashMovementRepository;
     private final PaymentRepository paymentRepository;
     private final EventPaymentRepository eventPaymentRepository;
+    private final OrderRepository orderRepository;
     private final TenantRepository tenantRepository;
     private final BranchRepository branchRepository;
     private final UserRepository userRepository;
@@ -173,10 +178,9 @@ public class CashService {
 
     public CashMovementResponse getMovementDetail(String publicId) {
         Long tenantId = TenantContext.getTenantId();
-        Long branchId = TenantContext.getBranchId();
 
         CashMovement movement = cashMovementRepository
-                .findByPublicIdAndTenant_IdAndBranch_Id(publicId, tenantId, branchId)
+                .findByPublicIdAndTenant_Id(publicId, tenantId)
                 .orElseThrow(() -> new EntityNotFoundException("Movimiento no encontrado"));
 
         return mapMovementToResponse(movement);
@@ -226,60 +230,146 @@ public class CashService {
             int page, int size,
             CashMovementType type, Boolean voided,
             String userPublicId,
-            LocalDateTime from, LocalDateTime to) {
+            String branchPublicId, String cashRegisterPublicId,
+            String from, String to) {
 
-        Long branchId = TenantContext.getBranchId();
-        Pageable pageable = PageRequest.of(page, size);
+        Long tenantId = TenantContext.getTenantId();
+        Pageable pageable = historyPage(page, size, "createdAt");
 
         return cashMovementRepository.findHistoryByBranch(
-                        branchId, type, voided, userPublicId, from, to, pageable)
+                        tenantId, blankToNull(branchPublicId), blankToNull(cashRegisterPublicId),
+                        type, voided, blankToNull(userPublicId),
+                        parseDateBoundary(from, false), parseDateBoundary(to, true), pageable)
                 .map(this::mapMovementToResponse);
     }
 
     public Page<CashRegisterHistoryResponse> getCashRegisterHistory(
             int page, int size,
             CashStatus status, String openedByPublicId,
-            LocalDateTime from, LocalDateTime to) {
+            String branchPublicId, String from, String to) {
 
-        Long branchId = TenantContext.getBranchId();
-        Pageable pageable = PageRequest.of(page, size);
+        Long tenantId = TenantContext.getTenantId();
+        Pageable pageable = historyPage(page, size, "openedAt");
 
-        return cashRegisterRepository.findHistoryByBranch(
-                        branchId, status, openedByPublicId, from, to, pageable)
-                .map(this::mapToCashRegisterHistoryResponse);
+        Page<CashRegister> cashPage = cashRegisterRepository.findHistoryByBranch(
+                        tenantId, blankToNull(branchPublicId), status, blankToNull(openedByPublicId),
+                        parseDateBoundary(from, false), parseDateBoundary(to, true), pageable);
+        if (cashPage.isEmpty()) return Page.empty(pageable);
+
+        List<Long> cashIds = cashPage.getContent().stream().map(CashRegister::getId).toList();
+        CashHistoryBatch batch = loadCashSummaries(cashPage.getContent(), cashIds);
+        Map<Long, Long> orderCounts = new HashMap<>();
+        orderRepository.countByCashRegisters(cashIds)
+                .forEach(row -> orderCounts.put((Long) row[0], (Long) row[1]));
+
+        List<CashRegisterHistoryResponse> content = cashPage.getContent().stream()
+                .map(cash -> mapToCashRegisterHistoryResponse(
+                        cash, batch.summaries().get(cash.getId()),
+                        orderCounts.getOrDefault(cash.getId(), 0L),
+                        batch.movementCounts().getOrDefault(cash.getId(), 0L)))
+                .toList();
+        return new org.springframework.data.domain.PageImpl<>(
+                content, pageable, cashPage.getTotalElements());
     }
 
     public CashRegisterDetailResponse getCashRegisterDetail(String publicId) {
         Long tenantId = TenantContext.getTenantId();
-        Long branchId = TenantContext.getBranchId();
 
         CashRegister cash = cashRegisterRepository
-                .findByPublicIdAndTenant_IdAndBranch_Id(publicId, tenantId, branchId)
+                .findByPublicIdAndTenant_Id(publicId, tenantId)
                 .orElseThrow(() -> new EntityNotFoundException("Caja no encontrada"));
 
         return mapToCashRegisterDetailResponse(cash);
     }
 
-    private CashRegisterHistoryResponse mapToCashRegisterHistoryResponse(CashRegister cash) {
-        CashSummary summary = calculateCashSummary(cash);
-        long movementCount = cashMovementRepository.countByCashRegister_Id(cash.getId());
-        long orderCount = 0; // simplified; could count orders in the period if needed
+    private CashRegisterHistoryResponse mapToCashRegisterHistoryResponse(
+            CashRegister cash, CashSummary summary, long orderCount, long movementCount) {
 
         return CashRegisterHistoryResponse.builder()
                 .publicId(cash.getPublicId())
                 .status(cash.getStatus().name())
                 .openingAmount(cash.getOpeningAmount())
                 .closingAmount(cash.getClosingAmount())
-                .expectedAmount(cash.getExpectedAmount())
+                .expectedAmount(cash.getStatus() == CashStatus.CLOSED && cash.getExpectedAmount() != null
+                        ? cash.getExpectedAmount() : summary.expectedCash())
                 .difference(cash.getDifference())
                 .openedAt(cash.getOpenedAt())
                 .closedAt(cash.getClosedAt())
                 .openedByName(cash.getOpenedBy().getName())
+                .openedByPublicId(cash.getOpenedBy().getPublicId())
+                .openedByEmail(cash.getOpenedBy().getEmail())
                 .closedByName(cash.getClosedBy() != null
                         ? cash.getClosedBy().getName() : null)
+                .closedByPublicId(cash.getClosedBy() != null ? cash.getClosedBy().getPublicId() : null)
+                .closedByEmail(cash.getClosedBy() != null ? cash.getClosedBy().getEmail() : null)
+                .branchPublicId(cash.getBranch().getPublicId())
+                .branchName(cash.getBranch().getName())
+                .cashSales(summary.cashSales())
+                .cardSales(summary.cardSales())
+                .transferSales(summary.transferSales())
+                .depositTotal(summary.depositTotal())
+                .withdrawalTotal(summary.withdrawalTotal())
                 .orderCount(orderCount)
                 .movementCount((int) movementCount)
                 .build();
+    }
+
+    private record CashHistoryBatch(
+            Map<Long, CashSummary> summaries,
+            Map<Long, Long> movementCounts) {}
+
+    private CashHistoryBatch loadCashSummaries(
+            List<CashRegister> registers, List<Long> cashIds) {
+        Map<Long, CashAccumulator> values = new HashMap<>();
+        registers.forEach(cash -> values.put(cash.getId(), new CashAccumulator(cash.getOpeningAmount())));
+
+        paymentRepository.sumByCashRegisters(cashIds).forEach(row -> {
+            if (row[1] != null) values.get((Long) row[0])
+                    .addPos((PaymentMethod) row[1], (BigDecimal) row[2]);
+        });
+        eventPaymentRepository.sumByCashRegisters(cashIds).forEach(row -> values.get((Long) row[0])
+                .addEvent((PaymentMethod) row[1], (BigDecimal) row[2]));
+        Map<Long, Long> movementCounts = new HashMap<>();
+        cashMovementRepository.sumByCashRegisters(cashIds).forEach(row -> {
+            Long cashId = (Long) row[0];
+            values.get(cashId).addMovement((CashMovementType) row[1], (BigDecimal) row[2]);
+            movementCounts.merge(cashId, (Long) row[3], Long::sum);
+        });
+
+        Map<Long, CashSummary> result = new HashMap<>();
+        values.forEach((id, value) -> result.put(id, value.toSummary()));
+        return new CashHistoryBatch(result, movementCounts);
+    }
+
+    private static final class CashAccumulator {
+        private final BigDecimal opening;
+        private BigDecimal posCash = BigDecimal.ZERO;
+        private BigDecimal posCard = BigDecimal.ZERO;
+        private BigDecimal posTransfer = BigDecimal.ZERO;
+        private BigDecimal eventCash = BigDecimal.ZERO;
+        private BigDecimal eventCard = BigDecimal.ZERO;
+        private BigDecimal eventTransfer = BigDecimal.ZERO;
+        private BigDecimal deposits = BigDecimal.ZERO;
+        private BigDecimal withdrawals = BigDecimal.ZERO;
+
+        private CashAccumulator(BigDecimal opening) { this.opening = opening; }
+        private void addPos(PaymentMethod method, BigDecimal amount) {
+            switch (method) { case CASH -> posCash = amount; case CARD -> posCard = amount; case TRANSFER -> posTransfer = amount; }
+        }
+        private void addEvent(PaymentMethod method, BigDecimal amount) {
+            switch (method) { case CASH -> eventCash = amount; case CARD -> eventCard = amount; case TRANSFER -> eventTransfer = amount; }
+        }
+        private void addMovement(CashMovementType type, BigDecimal amount) {
+            if (type == CashMovementType.DEPOSIT) deposits = amount; else withdrawals = amount;
+        }
+        private CashSummary toSummary() {
+            BigDecimal cash = posCash.add(eventCash);
+            BigDecimal card = posCard.add(eventCard);
+            BigDecimal transfer = posTransfer.add(eventTransfer);
+            return new CashSummary(opening, posCash, eventCash, cash, posCard, eventCard, card,
+                    posTransfer, eventTransfer, transfer, deposits, withdrawals,
+                    opening.add(cash).add(deposits).subtract(withdrawals));
+        }
     }
 
     private CashRegisterDetailResponse mapToCashRegisterDetailResponse(CashRegister cash) {
@@ -288,6 +378,9 @@ public class CashService {
                 .add(summary.cardSales())
                 .add(summary.transferSales());
         long movementCount = cashMovementRepository.countByCashRegister_Id(cash.getId());
+        long orderCount = countOrders(cash);
+        BigDecimal historicalExpectedCash = cash.getStatus() == CashStatus.CLOSED
+                && cash.getExpectedAmount() != null ? cash.getExpectedAmount() : summary.expectedCash();
 
         return CashRegisterDetailResponse.builder()
                 .publicId(cash.getPublicId())
@@ -305,15 +398,21 @@ public class CashService {
                 .salesTotal(totalSales)
                 .depositTotal(summary.depositTotal())
                 .withdrawalTotal(summary.withdrawalTotal())
-                .expectedCash(summary.expectedCash())
+                .expectedCash(historicalExpectedCash)
                 .countedCash(cash.getClosingAmount())
                 .difference(cash.getDifference())
                 .openedAt(cash.getOpenedAt())
                 .closedAt(cash.getClosedAt())
                 .openedByName(cash.getOpenedBy().getName())
+                .openedByPublicId(cash.getOpenedBy().getPublicId())
+                .openedByEmail(cash.getOpenedBy().getEmail())
                 .closedByName(cash.getClosedBy() != null
                         ? cash.getClosedBy().getName() : null)
-                .orderCount(0)
+                .closedByPublicId(cash.getClosedBy() != null ? cash.getClosedBy().getPublicId() : null)
+                .closedByEmail(cash.getClosedBy() != null ? cash.getClosedBy().getEmail() : null)
+                .branchPublicId(cash.getBranch().getPublicId())
+                .branchName(cash.getBranch().getName())
+                .orderCount(orderCount)
                 .movementCount((int) movementCount)
                 .build();
     }
@@ -429,6 +528,11 @@ public class CashService {
                 .reason(movement.getReason())
                 .notes(movement.getNotes())
                 .userName(movement.getUser().getName())
+                .userPublicId(movement.getUser().getPublicId())
+                .userEmail(movement.getUser().getEmail())
+                .cashRegisterPublicId(movement.getCashRegister().getPublicId())
+                .branchPublicId(movement.getBranch().getPublicId())
+                .branchName(movement.getBranch().getName())
                 .createdAt(movement.getCreatedAt())
                 .voided(movement.getVoided())
                 .voidedAt(movement.getVoidedAt())
@@ -436,5 +540,30 @@ public class CashService {
                         ? movement.getVoidedBy().getName() : null)
                 .voidReason(movement.getVoidReason())
                 .build();
+    }
+
+    private long countOrders(CashRegister cash) {
+        LocalDateTime end = cash.getClosedAt() != null ? cash.getClosedAt() : LocalDateTime.now();
+        return orderRepository.countByCashPeriod(
+                cash.getTenant().getId(), cash.getBranch().getId(), cash.getOpenedAt(), end);
+    }
+
+    private Pageable historyPage(int page, int size, String property) {
+        return PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100),
+                Sort.by(Sort.Order.desc(property), Sort.Order.desc("id")));
+    }
+
+    private LocalDateTime parseDateBoundary(String value, boolean upperExclusive) {
+        if (value == null || value.isBlank()) return null;
+        if (value.length() == 10) {
+            java.time.LocalDate date = java.time.LocalDate.parse(value);
+            return upperExclusive ? date.plusDays(1).atStartOfDay() : date.atStartOfDay();
+        }
+        LocalDateTime parsed = LocalDateTime.parse(value);
+        return upperExclusive ? parsed.plusNanos(1) : parsed;
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 }

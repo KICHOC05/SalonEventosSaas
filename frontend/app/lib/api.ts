@@ -133,9 +133,15 @@ export async function apiFetch<T>(
 // PUBLIC API - LANDING
 // =====================================================
 
-import type { Package, StatsResponse, PublicAvailabilityResponse } from "~/types/landing";
+import type {
+  Package,
+  StatsResponse,
+  PublicAvailabilityResponse,
+  PublicFrequentClientRegistrationRequest,
+  PublicFrequentClientRegistrationResponse,
+} from "~/types/landing";
 
-const PUBLIC_API_BASE = "/api/public";
+const PUBLIC_API_BASE = "/public";
 
 export async function fetchPublicPackages(): Promise<Package[]> {
   return apiFetch<Package[]>(`${PUBLIC_API_BASE}/packages`);
@@ -146,11 +152,35 @@ export async function fetchPublicStats(): Promise<StatsResponse> {
 }
 
 export async function fetchPublicAvailability(
-  month: number,
-  year: number
-): Promise<AvailabilityResponse> {
-  return apiFetch<AvailabilityResponse>(
-    `${PUBLIC_API_BASE}/availability?month=${month}&year=${year}`
+  from: string,
+  to: string
+): Promise<PublicAvailabilityResponse> {
+  const tenantPublicId = import.meta.env.VITE_TENANT_PUBLIC_ID;
+  if (!tenantPublicId) {
+    throw new Error("VITE_TENANT_PUBLIC_ID no está configurado");
+  }
+
+  const params = new URLSearchParams({ tenantPublicId, from, to });
+  return apiFetch<PublicAvailabilityResponse>(
+    `${PUBLIC_API_BASE}/availability/calendar?${params.toString()}`
+  );
+}
+
+export async function registerPublicFrequentClient(
+  data: PublicFrequentClientRegistrationRequest
+): Promise<PublicFrequentClientRegistrationResponse> {
+  const tenantPublicId = import.meta.env.VITE_TENANT_PUBLIC_ID;
+  if (!tenantPublicId) {
+    throw new Error("VITE_TENANT_PUBLIC_ID no está configurado");
+  }
+
+  const params = new URLSearchParams({ tenantPublicId });
+  return apiFetch<PublicFrequentClientRegistrationResponse>(
+    `${PUBLIC_API_BASE}/frequent-clients/registrations?${params.toString()}`,
+    {
+      method: "POST",
+      body: JSON.stringify(data),
+    }
   );
 }
 
@@ -614,7 +644,16 @@ export interface CashMovementResponse {
     reason: string;
     notes: string | null;
     userName: string;
+    userPublicId: string;
+    userEmail: string;
+    cashRegisterPublicId: string;
+    branchPublicId: string;
+    branchName: string;
     createdAt: string;
+    voided: boolean;
+    voidedAt: string | null;
+    voidedByName: string | null;
+    voidReason: string | null;
 }
 
 export async function createCashWithdrawal(
@@ -645,6 +684,8 @@ export interface CashMovementHistoryParams {
     type?: CashMovementType;
     voided?: boolean;
     userPublicId?: string;
+    branchPublicId?: string;
+    cashRegisterPublicId?: string;
     from?: string;
     to?: string;
 }
@@ -658,6 +699,8 @@ export async function getCashMovementHistory(
     if (params.type) searchParams.set("type", params.type);
     if (params.voided !== undefined) searchParams.set("voided", String(params.voided));
     if (params.userPublicId) searchParams.set("userPublicId", params.userPublicId);
+    if (params.branchPublicId) searchParams.set("branchPublicId", params.branchPublicId);
+    if (params.cashRegisterPublicId) searchParams.set("cashRegisterPublicId", params.cashRegisterPublicId);
     if (params.from) searchParams.set("from", params.from);
     if (params.to) searchParams.set("to", params.to);
     const qs = searchParams.toString();
@@ -692,7 +735,18 @@ export interface CashRegisterHistoryItem {
     openedAt: string;
     closedAt: string | null;
     openedByName: string;
+    openedByPublicId: string;
+    openedByEmail: string;
     closedByName: string | null;
+    closedByPublicId: string | null;
+    closedByEmail: string | null;
+    branchPublicId: string;
+    branchName: string;
+    cashSales: number;
+    cardSales: number;
+    transferSales: number;
+    depositTotal: number;
+    withdrawalTotal: number;
     orderCount: number;
     movementCount: number;
 }
@@ -719,7 +773,13 @@ export interface CashRegisterDetail {
     openedAt: string;
     closedAt: string | null;
     openedByName: string;
+    openedByPublicId: string;
+    openedByEmail: string;
     closedByName: string | null;
+    closedByPublicId: string | null;
+    closedByEmail: string | null;
+    branchPublicId: string;
+    branchName: string;
     orderCount: number;
     movementCount: number;
 }
@@ -729,6 +789,7 @@ export interface CashRegisterHistoryParams {
     size?: number;
     status?: string;
     openedByPublicId?: string;
+    branchPublicId?: string;
     from?: string;
     to?: string;
 }
@@ -741,6 +802,7 @@ export async function getCashRegisterHistory(
     if (params.size !== undefined) searchParams.set("size", String(params.size));
     if (params.status) searchParams.set("status", params.status);
     if (params.openedByPublicId) searchParams.set("openedByPublicId", params.openedByPublicId);
+    if (params.branchPublicId) searchParams.set("branchPublicId", params.branchPublicId);
     if (params.from) searchParams.set("from", params.from);
     if (params.to) searchParams.set("to", params.to);
     const qs = searchParams.toString();
@@ -793,6 +855,8 @@ export interface OrderItemResponse {
 
 export interface OrderResponse {
     publicId: string;
+    orderNumber: number;
+    shortCode: string;
     status: OrderStatus;
     customerName: string | null;
     childName: string | null;
@@ -802,11 +866,29 @@ export interface OrderResponse {
     createdAt: string;
     closedAt: string | null;
     sellerName?: string;
+    sellerPublicId?: string;
+    sellerEmail?: string;
+    branchPublicId: string;
+    branchName: string;
     paymentMethods?: string[];
     childNames?: string[];
     clientPublicId?: string;
     clientParentName?: string;
     items: OrderItemResponse[];
+    payments: OrderPaymentDetail[];
+}
+
+export interface OrderPaymentDetail {
+    publicId: string;
+    paymentMethod: PaymentMethod;
+    amount: number;
+    amountReceived: number | null;
+    changeAmount: number | null;
+    reference: string | null;
+    createdAt: string;
+    receivedByPublicId: string;
+    receivedByName: string;
+    receivedByEmail: string;
 }
 
 export async function createOrder(
@@ -914,6 +996,10 @@ export interface OrderHistoryRecord {
     closedAt: string | null;
     customerName: string | null;
     sellerName: string;
+    sellerPublicId: string;
+    sellerEmail: string;
+    branchPublicId: string;
+    branchName: string;
     status: string;
     totalAmount: number;
     paymentMethods: string[];
@@ -926,7 +1012,11 @@ export interface OrderHistoryParams {
     page?: number;
     size?: number;
     search?: string;
+    orderNumber?: string;
     status?: string;
+    paymentMethod?: PaymentMethod;
+    userPublicId?: string;
+    branchPublicId?: string;
     createdAtFrom?: string;
     createdAtTo?: string;
 }
@@ -938,7 +1028,11 @@ export async function fetchOrderHistory(
     if (params.page !== undefined) sp.set("page", String(params.page));
     if (params.size !== undefined) sp.set("size", String(params.size));
     if (params.search) sp.set("search", params.search);
+    if (params.orderNumber) sp.set("orderNumber", params.orderNumber);
     if (params.status) sp.set("status", params.status);
+    if (params.paymentMethod) sp.set("paymentMethod", params.paymentMethod);
+    if (params.userPublicId) sp.set("userPublicId", params.userPublicId);
+    if (params.branchPublicId) sp.set("branchPublicId", params.branchPublicId);
     if (params.createdAtFrom) sp.set("createdAtFrom", params.createdAtFrom);
     if (params.createdAtTo) sp.set("createdAtTo", params.createdAtTo);
 
@@ -1398,4 +1492,49 @@ export async function fetchTimerHistory(
 
 export async function fetchTimerDashboard(): Promise<TimerDashboardResponse> {
     return apiFetch<TimerDashboardResponse>("/timers/dashboard");
+}
+
+export type FinancialAuditSource = "POS" | "EVENT" | "MOVEMENT";
+
+export interface FinancialAuditEntry {
+    source: FinancialAuditSource;
+    type: "PAYMENT" | CashMovementType;
+    reference: string;
+    date: string;
+    amount: number;
+    paymentMethod: PaymentMethod | null;
+    userPublicId: string | null;
+    userName: string | null;
+    userEmail: string | null;
+    branchPublicId: string;
+    branchName: string;
+    operationPublicId: string;
+    entryPublicId: string;
+    cashRegisterPublicId: string | null;
+}
+
+export interface FinancialAuditParams {
+    page?: number;
+    size?: number;
+    source?: FinancialAuditSource;
+    paymentMethod?: PaymentMethod;
+    userPublicId?: string;
+    branchPublicId?: string;
+    from?: string;
+    to?: string;
+}
+
+export async function fetchFinancialAudit(
+    params: FinancialAuditParams = {}
+): Promise<PageResponse<FinancialAuditEntry>> {
+    const sp = new URLSearchParams();
+    if (params.page !== undefined) sp.set("page", String(params.page));
+    if (params.size !== undefined) sp.set("size", String(params.size));
+    if (params.source) sp.set("source", params.source);
+    if (params.paymentMethod) sp.set("paymentMethod", params.paymentMethod);
+    if (params.userPublicId) sp.set("userPublicId", params.userPublicId);
+    if (params.branchPublicId) sp.set("branchPublicId", params.branchPublicId);
+    if (params.from) sp.set("from", params.from);
+    if (params.to) sp.set("to", params.to);
+    return apiFetch<PageResponse<FinancialAuditEntry>>(`/pos/audit?${sp.toString()}`);
 }

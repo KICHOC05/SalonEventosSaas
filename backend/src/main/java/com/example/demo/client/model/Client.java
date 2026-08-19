@@ -58,6 +58,9 @@ public class Client {
     @Column(nullable = false)
     private Boolean frequent = false;
 
+    @Column(name = "frequent_program_consent_at")
+    private LocalDateTime frequentProgramConsentAt;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ClientStatus status = ClientStatus.ACTIVE;

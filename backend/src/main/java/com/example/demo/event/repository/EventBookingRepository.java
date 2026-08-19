@@ -36,6 +36,18 @@ public interface EventBookingRepository extends JpaRepository<EventBooking, Long
             LocalDate to
     );
 
+    @Query("SELECT DISTINCT e.eventDate FROM EventBooking e " +
+            "WHERE e.tenant.id = :tenantId " +
+            "AND e.eventDate BETWEEN :from AND :to " +
+            "AND e.status IN :statuses " +
+            "ORDER BY e.eventDate")
+    List<LocalDate> findOccupiedDates(
+            @Param("tenantId") Long tenantId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to,
+            @Param("statuses") List<EventStatus> statuses
+    );
+
     // Buscar conflictos por horario
     @Query("SELECT e FROM EventBooking e " +
             "WHERE e.tenant.id = :tenantId " +

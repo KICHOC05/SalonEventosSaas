@@ -476,7 +476,7 @@ export default function EventsDetailsModal({
   if (loading) {
     return (
       <dialog className="modal modal-open" open>
-        <div className="modal-box max-w-2xl">
+        <div className="modal-box max-w-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-base-content/20">
           <div className="flex items-center justify-between mb-4">
             <div className="skeleton h-6 w-32" />
             <div className="skeleton h-8 w-8 rounded-full" />
@@ -512,7 +512,7 @@ export default function EventsDetailsModal({
   if (!loading && !event) {
     return (
       <dialog className="modal modal-open" open>
-        <div className="modal-box max-w-2xl">
+        <div className="modal-box max-w-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-base-content/20">
           <div className="flex flex-col items-center justify-center py-12">
             <AlertTriangle className="w-16 h-16 text-warning mb-4" />
             <h3 className="text-lg font-semibold text-base-content/60">
@@ -542,7 +542,7 @@ export default function EventsDetailsModal({
   return (
     <>
       <dialog className="modal modal-open" open>
-        <div className="modal-box max-w-2xl">
+        <div className="modal-box max-w-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-base-content/20">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">

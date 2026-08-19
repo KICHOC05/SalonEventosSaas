@@ -29,10 +29,15 @@ import {
   MessageCircle,
   Check,
   Clock,
-  Zap,
   Award,
+  ShieldCheck,
+  UserRound,
+  Baby,
+  LoaderCircle,
 } from "lucide-react";
 import { buildMeta } from "~/lib/meta";
+import { fetchPublicAvailability, registerPublicFrequentClient } from "~/lib/api";
+import "~/styles/landing.css";
 
 export function meta() {
   return buildMeta(
@@ -58,16 +63,6 @@ interface Package {
   features: { icon: any; text: string }[];
 }
 
-interface Review {
-  id: number;
-  name: string;
-  date: string;
-  img: string;
-  text: string;
-  stars: number;
-  borderColor: string;
-}
-
 interface VideoCard {
   id: number;
   src: string;
@@ -77,11 +72,12 @@ interface VideoCard {
   subtitle: string;
 }
 
-type DayStatus = "available" | "occupied" | "partial" | "empty";
+type DayStatus = "available" | "occupied" | "past" | "empty";
 
 interface CalDay {
   day: number;
   status: DayStatus;
+  dateStr?: string;
   tip?: string;
 }
 
@@ -191,111 +187,6 @@ const packagesData: Package[] = [
       { icon: Camera, text: "Fotógrafo incluido" },
     ],
     price: "$3,499",
-  },
-];
-
-const calendarDays: CalDay[] = [
-  { day: 0, status: "empty" },
-  { day: 0, status: "empty" },
-  { day: 1, status: "available", tip: "✅ Disponible todo el día" },
-  { day: 2, status: "occupied", tip: "❌ Ocupado" },
-  { day: 3, status: "available", tip: "✅ Disponible" },
-  { day: 4, status: "partial", tip: "🟡 Solo mañana" },
-  { day: 5, status: "available", tip: "✅ Disponible" },
-  { day: 6, status: "available" },
-  { day: 7, status: "available" },
-  { day: 8, status: "occupied" },
-  { day: 9, status: "available" },
-  { day: 10, status: "available" },
-  { day: 11, status: "partial" },
-  { day: 12, status: "available" },
-  { day: 13, status: "available" },
-  { day: 14, status: "available" },
-  { day: 15, status: "occupied" },
-  { day: 16, status: "occupied" },
-  { day: 17, status: "available" },
-  { day: 18, status: "partial" },
-  { day: 19, status: "available" },
-  { day: 20, status: "available" },
-  { day: 21, status: "available" },
-  { day: 22, status: "available" },
-  { day: 23, status: "available" },
-  { day: 24, status: "available" },
-  { day: 25, status: "available" },
-  { day: 26, status: "partial" },
-  { day: 27, status: "available" },
-  { day: 28, status: "available" },
-  { day: 29, status: "occupied" },
-  { day: 30, status: "available" },
-  { day: 31, status: "available" },
-];
-
-const reviewsData: Review[] = [
-  {
-    id: 1,
-    name: "María González",
-    date: "15 de octubre, 2024",
-    img: "https://randomuser.me/api/portraits/women/32.jpg",
-    text: "La fiesta de mi hijo de 7 años fue increíble. Los animadores, los juegos, la decoración… todo perfecto. ¡Volveremos seguro!",
-    stars: 5,
-    borderColor: "ring-secondary",
-  },
-  {
-    id: 2,
-    name: "Carlos Ramírez",
-    date: "8 de octubre, 2024",
-    img: "https://randomuser.me/api/portraits/men/54.jpg",
-    text: "Elegimos el paquete Galáctico y superó todas las expectativas. La atención al detalle fue impecable. Mi hija todavía habla de su 'aventura espacial'.",
-    stars: 5,
-    borderColor: "ring-primary",
-  },
-  {
-    id: 3,
-    name: "Ana Martínez",
-    date: "2 de octubre, 2024",
-    img: "https://randomuser.me/api/portraits/women/67.jpg",
-    text: "El mejor salón de fiestas al que hemos ido. El personal es muy atento y profesional, las instalaciones están impecables. Totalmente recomendado.",
-    stars: 5,
-    borderColor: "ring-purple-400",
-  },
-];
-
-const frequentClients = [
-  {
-    id: "1",
-    name: "María",
-    familyName: "González",
-    photo: "https://randomuser.me/api/portraits/women/32.jpg",
-    eventsCount: 5,
-    isFrequent: true,
-    lastEventDate: "2024-12-15",
-  },
-  {
-    id: "2",
-    name: "Carlos",
-    familyName: "Ramírez",
-    photo: "https://randomuser.me/api/portraits/men/54.jpg",
-    eventsCount: 3,
-    isFrequent: true,
-    lastEventDate: "2024-11-20",
-  },
-  {
-    id: "3",
-    name: "Ana",
-    familyName: "Martínez",
-    photo: "https://randomuser.me/api/portraits/women/67.jpg",
-    eventsCount: 4,
-    isFrequent: true,
-    lastEventDate: "2024-12-01",
-  },
-  {
-    id: "4",
-    name: "Luis",
-    familyName: "Hernández",
-    photo: "https://randomuser.me/api/portraits/men/32.jpg",
-    eventsCount: 2,
-    isFrequent: false,
-    lastEventDate: "2024-10-10",
   },
 ];
 
@@ -496,91 +387,88 @@ function HeroSection() {
   return (
     <section
       id="inicio"
-      className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20"
+      className="sk-hero"
     >
-      <div className="absolute inset-0">
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
-          className="w-full h-full object-cover"
-        >
-          <source
-            src="https://assets.mixkit.co/videos/preview/mixkit-children-playing-with-a-space-roller-coaster-41547-large.mp4"
-            type="video/mp4"
+      <div className="sk-hero-nebula" aria-hidden="true" />
+      <div className="sk-hero-stars" aria-hidden="true" />
+
+      <div className="sk-hero-shell">
+        <div className="sk-hero-copy">
+          <img
+            src="/spacekids/spacekids-logo.png"
+            alt="Space Kids, salón de eventos infantiles"
+            className="sk-hero-logo animate-fade-in-up"
           />
-        </video>
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A1F] via-[#0A0A1F]/90 to-[#12122B]/95" />
-      </div>
-
-      <div className="container mx-auto px-4 relative z-10 text-center">
-        {/* Badge de urgencia */}
-        <div className="animate-fade-in-up">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/20 border border-red-500/30 rounded-full text-sm font-medium text-red-400 mb-6 backdrop-blur-sm">
-            <Zap className="w-4 h-4 animate-pulse" />
-            <span>🔥 Fechas de Julio casi agotadas</span>
+          <div className="sk-eyebrow animate-fade-in-up">
+            <span className="sk-eyebrow-dot" aria-hidden="true" />
+            Salón infantil · Una aventura fuera de este mundo
           </div>
-        </div>
 
-        <div className="animate-fade-in-up" style={{ animationDelay: "100ms" }}>
-          <span className="inline-block px-6 py-3 bg-base-100/20 backdrop-blur-sm border border-primary/30 rounded-full text-sm font-medium mb-6 shadow-lg text-white/90">
-            🚀 Bienvenidos a bordo
-          </span>
+          <div className="sk-mobile-mascot">
+            <div className="sk-mobile-mascot-orbit" aria-hidden="true" />
+            <div className="sk-mobile-mascot-glow" aria-hidden="true" />
+            <img
+              src="/spacekids/luna-alien.png"
+              alt="Luna, la anfitriona espacial de Space Kids"
+            />
+          </div>
 
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-heading font-bold mb-6 leading-tight">
-            <span className="bg-gradient-to-r from-yellow-300 via-pink-300 to-cyan-300 bg-clip-text text-transparent">
-              ¡La mejor fiesta
-            </span>
-            <br />
-            <span className="bg-gradient-to-r from-cyan-300 via-purple-300 to-pink-300 bg-clip-text text-transparent">
-              infantil del universo!
-            </span>
+          <h1 className="sk-hero-title animate-fade-in-up">
+            La fiesta de sus sueños
+            <span>despega aquí.</span>
           </h1>
 
-          <p className="text-xl md:text-2xl text-white/90 mb-8 max-w-3xl mx-auto leading-relaxed">
-            Un viaje intergaláctico lleno de diversión, juegos y aventuras para
-            los pequeños astronautas
+          <p className="sk-hero-description animate-fade-in-up">
+            Creamos celebraciones espaciales llenas de juego, color y momentos
+            que toda la familia querrá volver a vivir.
           </p>
+
+          <div className="sk-hero-actions animate-fade-in-up">
+            <a href="#reservar" className="sk-button sk-button-primary">
+              <Rocket className="h-5 w-5" aria-hidden="true" />
+              Reservar mi misión
+            </a>
+            <a href="#disponibilidad" className="sk-button sk-button-secondary">
+              <Calendar className="h-5 w-5" aria-hidden="true" />
+              Explorar fechas
+            </a>
+          </div>
+
+          <ul className="sk-hero-benefits" aria-label="Beneficios Space Kids">
+            <li><Check aria-hidden="true" /> Atención personalizada</li>
+            <li><Check aria-hidden="true" /> Experiencia familiar</li>
+            <li><Check aria-hidden="true" /> Fiesta a tu medida</li>
+          </ul>
         </div>
 
-        {/* Estadísticas rápidas */}
-        <div className="flex flex-wrap justify-center gap-8 mb-10 animate-fade-in-up" style={{ animationDelay: "200ms" }}>
-          <div className="flex items-center gap-2 text-white/80">
-            <Users className="w-5 h-5 text-secondary" />
-            <span className="font-bold">500+</span>
-            <span className="text-sm">Fiestas</span>
+        <div className="sk-hero-visual" aria-label="Luna, la anfitriona espacial de Space Kids">
+          <div className="sk-orbit sk-orbit-one" aria-hidden="true" />
+          <div className="sk-orbit sk-orbit-two" aria-hidden="true" />
+          <div className="sk-planet sk-planet-pink" aria-hidden="true" />
+          <div className="sk-planet sk-planet-yellow" aria-hidden="true" />
+          <div className="sk-visual-glow" aria-hidden="true" />
+          <img
+            src="/spacekids/luna-alien.png"
+            alt="Luna, una pequeña alienígena con traje espacial morado, dando la bienvenida"
+            className="sk-alien"
+            loading="eager"
+            fetchPriority="high"
+          />
+          <div className="sk-float-card sk-float-card-games">
+            <Gamepad2 aria-hidden="true" />
+            <span><strong>Diversión</strong>Zona de juegos</span>
           </div>
-          <div className="flex items-center gap-2 text-white/80">
-            <Star className="w-5 h-5 text-yellow-400" />
-            <span className="font-bold">4.9</span>
-            <span className="text-sm">Calificación</span>
+          <div className="sk-float-card sk-float-card-party">
+            <Cake aria-hidden="true" />
+            <span><strong>Tu celebración</strong>A tu estilo</span>
           </div>
-          <div className="flex items-center gap-2 text-white/80">
-            <Users className="w-5 h-5 text-cyan-400" />
-            <span className="font-bold">10k+</span>
-            <span className="text-sm">Niños felices</span>
-          </div>
-        </div>
-
-        {/* CTAs */}
-        <div className="flex flex-col sm:flex-row gap-6 justify-center items-center animate-fade-in-up" style={{ animationDelay: "300ms" }}>
-          <a href="#reservar" className="btn-space-primary text-lg group inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-pink-600 to-purple-700 rounded-full font-bold text-white hover:opacity-90 transition transform hover:scale-105 shadow-lg shadow-pink-500/30">
-            <Rocket className="w-5 h-5 group-hover:rotate-12 transition-transform" /> 
-            Reservar evento
-          </a>
-          <a href="#disponibilidad" className="btn-space-secondary text-lg group inline-flex items-center gap-2 px-8 py-4 bg-white/10 backdrop-blur-sm border border-white/30 rounded-full font-bold text-white hover:bg-white/20 transition transform hover:scale-105">
-            <Calendar className="w-5 h-5 group-hover:scale-110 transition-transform" /> 
-            Ver disponibilidad
-          </a>
         </div>
       </div>
 
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-        <div className="w-12 h-20 border-2 border-white/30 rounded-full flex justify-center bg-[#0A0A1F]/50">
-          <div className="w-1.5 h-4 bg-gradient-to-b from-white to-transparent rounded-full mt-3 animate-pulse" />
-        </div>
-      </div>
+      <a href="#plan-mision" className="sk-scroll-cue" aria-label="Descubrir la experiencia Space Kids">
+        <span>Descubre la misión</span>
+        <ChevronRight aria-hidden="true" />
+      </a>
     </section>
   );
 }
@@ -619,6 +507,73 @@ function StatsSection() {
             </div>
           ))}
         </div>
+      </div>
+    </section>
+  );
+}
+
+// =====================================================
+// MISSION JOURNEY
+// =====================================================
+
+function MissionJourneySection() {
+  const steps = [
+    {
+      number: "01",
+      title: "Elige tu fecha",
+      description: "Revisa el calendario y cuéntanos cuándo quieres despegar.",
+    },
+    {
+      number: "02",
+      title: "Diseñamos la misión",
+      description: "Personalizamos la experiencia según tu celebración y tus invitados.",
+    },
+    {
+      number: "03",
+      title: "Disfruta sin estrés",
+      description: "Tú celebras; nuestro equipo se encarga de llevar la misión a buen puerto.",
+    },
+  ];
+
+  return (
+    <section id="plan-mision" className="sk-journey" aria-labelledby="journey-title">
+      <div className="sk-journey-shell">
+        <Animate from="left" className="sk-journey-art">
+          <div className="sk-journey-planet" aria-hidden="true" />
+          <img
+            src="/spacekids/astronautas-exploradores.png"
+            alt="Dos astronautas infantiles explorando juntos"
+            loading="lazy"
+          />
+          <div className="sk-journey-caption">
+            <Rocket aria-hidden="true" />
+            <span><strong>Una misión sencilla</strong>De la idea al gran día</span>
+          </div>
+        </Animate>
+
+        <Animate from="right" className="sk-journey-content">
+          <SectionBadge className="border-cyan-300/30 text-cyan-200">Plan de vuelo</SectionBadge>
+          <h2 id="journey-title">Organizar su gran día puede sentirse así de fácil.</h2>
+          <p className="sk-journey-lead">
+            Un recorrido claro, acompañado y pensado para que las familias tomen
+            decisiones con confianza.
+          </p>
+          <ol className="sk-journey-steps">
+            {steps.map((step) => (
+              <li key={step.number}>
+                <span>{step.number}</span>
+                <div>
+                  <h3>{step.title}</h3>
+                  <p>{step.description}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+          <a href="#reservar" className="sk-text-link">
+            Empezar a planear
+            <ArrowRight aria-hidden="true" />
+          </a>
+        </Animate>
       </div>
     </section>
   );
@@ -943,31 +898,147 @@ function PackagesSection() {
 // =====================================================
 
 function AvailabilitySection() {
+  const today = useMemo(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }, []);
+  const currentMonth = useMemo(
+    () => new Date(today.getFullYear(), today.getMonth(), 1),
+    [today]
+  );
+  const [visibleMonth, setVisibleMonth] = useState(currentMonth);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [occupiedDates, setOccupiedDates] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [requestVersion, setRequestVersion] = useState(0);
   const weekDays = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+  const formatLocalDate = useCallback((date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }, []);
+
+  const monthRange = useMemo(() => {
+    const fromDate = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1);
+    const toDate = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 0);
+    return {
+      from: formatLocalDate(fromDate),
+      to: formatLocalDate(toDate),
+    };
+  }, [formatLocalDate, visibleMonth]);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+    setOccupiedDates([]);
+
+    fetchPublicAvailability(monthRange.from, monthRange.to)
+      .then((response) => {
+        if (!active) return;
+        setOccupiedDates(response.occupiedDates ?? []);
+      })
+      .catch(() => {
+        if (!active) return;
+        setError("No pudimos consultar la agenda. Intenta nuevamente.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [monthRange, requestVersion]);
+
+  const monthLabel = useMemo(() => {
+    const value = new Intl.DateTimeFormat("es-MX", {
+      month: "long",
+      year: "numeric",
+    }).format(visibleMonth);
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  }, [visibleMonth]);
+
+  const calendarDays = useMemo<CalDay[]>(() => {
+    const year = visibleMonth.getFullYear();
+    const month = visibleMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const leadingEmptyDays = (firstDay.getDay() + 6) % 7;
+    const occupied = new Set(occupiedDates);
+    const todayStr = formatLocalDate(today);
+
+    const days: CalDay[] = Array.from({ length: leadingEmptyDays }, () => ({
+      day: 0,
+      status: "empty" as const,
+    }));
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const dateStr = formatLocalDate(new Date(year, month, day));
+      const status: DayStatus = dateStr < todayStr
+        ? "past"
+        : occupied.has(dateStr)
+          ? "occupied"
+          : "available";
+      days.push({
+        day,
+        dateStr,
+        status,
+        tip: status === "available"
+          ? "Disponible para reservar"
+          : status === "occupied"
+            ? "Fecha ocupada"
+            : "Fecha pasada",
+      });
+    }
+
+    return days;
+  }, [formatLocalDate, occupiedDates, today, visibleMonth]);
+
+  const selectedDateLabel = useMemo(() => {
+    if (!selectedDate) return "--/--/----";
+    return new Intl.DateTimeFormat("es-MX", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(new Date(`${selectedDate}T12:00:00`));
+  }, [selectedDate]);
+
+  const isCurrentMonth =
+    visibleMonth.getFullYear() === currentMonth.getFullYear() &&
+    visibleMonth.getMonth() === currentMonth.getMonth();
 
   const statusStyles: Record<DayStatus, string> = {
     available: "bg-success/20 border border-success text-base-content cursor-pointer hover:scale-95",
     occupied: "bg-error/20 border border-error text-base-content/50 cursor-not-allowed",
-    partial: "bg-warning/20 border border-warning text-base-content cursor-pointer hover:scale-95",
+    past: "bg-base-300/30 border border-base-300/40 text-base-content/30 cursor-not-allowed",
     empty: "bg-transparent border-transparent",
   };
 
   const handleDayClick = (d: CalDay) => {
-    if (d.status === "occupied" || d.status === "empty") return;
-    setSelectedDate(`2024-10-${String(d.day).padStart(2, "0")}`);
+    if (d.status !== "available" || !d.dateStr) return;
+    setSelectedDate(d.dateStr);
+  };
+
+  const changeMonth = (offset: number) => {
+    setVisibleMonth((month) => new Date(month.getFullYear(), month.getMonth() + offset, 1));
+    setSelectedDate(null);
   };
 
   return (
-    <section id="disponibilidad" className="py-24 px-4 bg-base-200">
+    <section id="disponibilidad" className="py-24 px-4 bg-base-200 sk-availability">
       <div className="container mx-auto">
         <Animate className="text-center mb-16">
-          <SectionBadge className="border-primary/30 text-primary">Fechas en tiempo real</SectionBadge>
+          <SectionBadge className="border-primary/30 text-primary">Agenda conectada</SectionBadge>
           <h2 className="text-4xl md:text-5xl font-heading font-bold mt-6 mb-6 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
             Disponibilidad
           </h2>
           <p className="text-xl text-base-content/70 max-w-3xl mx-auto">
-            Consulta rápidamente qué fechas están libres para tu evento espacial
+            Consulta las fechas disponibles directamente desde nuestra agenda de eventos.
+            Los cambios realizados por el equipo se reflejan automáticamente.
           </p>
         </Animate>
 
@@ -977,19 +1048,46 @@ function AvailabilitySection() {
               <div className="flex items-center justify-between mb-8">
                 <div>
                   <h3 className="text-xl font-heading font-bold flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-primary" /> Octubre 2024
+                    <Calendar className="w-5 h-5 text-primary" /> {monthLabel}
                   </h3>
-                  <p className="text-sm text-base-content/50">Enero 2024 — Diciembre 2024</p>
+                  <p className="text-sm text-base-content/50">
+                    {loading ? "Consultando agenda…" : "Disponibilidad actualizada"}
+                  </p>
                 </div>
                 <div className="flex gap-2">
-                  <button className="w-10 h-10 rounded-full bg-base-200 border border-primary/30 hover:bg-primary/20 transition flex items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={() => changeMonth(-1)}
+                    disabled={isCurrentMonth || loading}
+                    aria-label="Ver mes anterior"
+                    className="w-10 h-10 rounded-full bg-base-200 border border-primary/30 hover:bg-primary/20 transition flex items-center justify-center disabled:opacity-35 disabled:cursor-not-allowed"
+                  >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
-                  <button className="w-10 h-10 rounded-full bg-base-200 border border-primary/30 hover:bg-primary/20 transition flex items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={() => changeMonth(1)}
+                    disabled={loading}
+                    aria-label="Ver mes siguiente"
+                    className="w-10 h-10 rounded-full bg-base-200 border border-primary/30 hover:bg-primary/20 transition flex items-center justify-center disabled:opacity-35 disabled:cursor-not-allowed"
+                  >
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
               </div>
+
+              {error && (
+                <div className="mb-5 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-xl border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
+                  <span>{error}</span>
+                  <button
+                    type="button"
+                    onClick={() => setRequestVersion((version) => version + 1)}
+                    className="font-bold underline underline-offset-4"
+                  >
+                    Reintentar
+                  </button>
+                </div>
+              )}
 
               <div className="grid grid-cols-7 gap-2 mb-4">
                 {weekDays.map((wd) => (
@@ -999,16 +1097,19 @@ function AvailabilitySection() {
                 ))}
               </div>
 
-              <div className="grid grid-cols-7 gap-2">
+              <div className={`relative grid grid-cols-7 gap-2 transition-opacity ${loading ? "opacity-45" : "opacity-100"}`} aria-busy={loading}>
                 {calendarDays.map((d, i) => {
                   if (d.status === "empty") return <div key={`e${i}`} className="aspect-square" />;
-                  const dateStr = `2024-10-${String(d.day).padStart(2, "0")}`;
-                  const isSelected = selectedDate === dateStr;
+                  const isSelected = selectedDate === d.dateStr;
 
                   return (
-                    <div
-                      key={d.day}
+                    <button
+                      type="button"
+                      key={d.dateStr}
                       onClick={() => handleDayClick(d)}
+                      disabled={d.status !== "available" || loading}
+                      aria-label={`${d.dateStr}: ${d.tip}`}
+                      aria-pressed={isSelected}
                       className={`group relative aspect-square flex items-center justify-center rounded-xl transition-all text-sm font-medium bg-base-200
                         ${statusStyles[d.status]}
                         ${isSelected
@@ -1023,9 +1124,14 @@ function AvailabilitySection() {
                           {d.tip}
                         </span>
                       )}
-                    </div>
+                    </button>
                   );
                 })}
+                {loading && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <span className="loading loading-spinner loading-md text-primary" aria-label="Cargando disponibilidad" />
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-6 mt-8 pt-6 border-t border-primary/30">
@@ -1038,8 +1144,8 @@ function AvailabilitySection() {
                   <span className="text-sm text-base-content/80">Ocupado</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-warning/30 border border-warning" />
-                  <span className="text-sm text-base-content/80">Parcial</span>
+                  <div className="w-4 h-4 rounded bg-base-300/30 border border-base-300/40" />
+                  <span className="text-sm text-base-content/80">Fecha pasada</span>
                 </div>
               </div>
             </div>
@@ -1057,20 +1163,18 @@ function AvailabilitySection() {
 
               <div className="mb-8 p-6 bg-base-200 rounded-xl text-center border border-secondary/30">
                 <p className="text-sm text-base-content/50 mb-2">Fecha seleccionada</p>
-                <p className="text-3xl font-bold text-secondary">{selectedDate ?? "--/--/----"}</p>
+                <p className="text-2xl font-bold text-secondary capitalize">{selectedDateLabel}</p>
               </div>
 
               <a
-                href={selectedDate ? `https://wa.me/521234567890?text=¡Hola! Quiero reservar para el día ${selectedDate} en Space Kids` : "#"}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={selectedDate ? "#reservar" : "#"}
                 className={`block w-full py-4 bg-gradient-to-r from-pink-600 to-purple-700 rounded-full text-center font-bold text-white hover:opacity-90 transition transform hover:scale-105 ${!selectedDate ? "opacity-50 cursor-not-allowed" : ""}`}
               >
-                <CalendarCheck className="w-4 h-4 inline mr-2" /> Reservar esta fecha
+                <CalendarCheck className="w-4 h-4 inline mr-2" /> Consultar esta fecha
               </a>
 
               <p className="text-xs text-base-content/40 text-center mt-4">
-                * Las fechas parciales tienen disponibilidad limitada
+                * La disponibilidad se confirma nuevamente al registrar la reservación.
               </p>
             </div>
           </Animate>
@@ -1084,132 +1188,271 @@ function AvailabilitySection() {
 // CLIENTES FRECUENTES SECTION
 // =====================================================
 
+const INITIAL_FREQUENT_CLIENT_FORM = {
+  parentName: "",
+  childName: "",
+  phone: "",
+  email: "",
+  consentAccepted: false,
+};
+
 function ClientesFrecuentesSection() {
+  const [form, setForm] = useState(INITIAL_FREQUENT_CLIENT_FORM);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [serverMessage, setServerMessage] = useState("");
+
+  const updateField = (field: keyof typeof INITIAL_FREQUENT_CLIENT_FORM, value: string | boolean) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    setErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+    if (status === "error") setStatus("idle");
+  };
+
+  const validate = () => {
+    const nextErrors: Record<string, string> = {};
+    const phoneDigits = form.phone.replace(/\D/g, "");
+
+    if (form.parentName.trim().length < 2) {
+      nextErrors.parentName = "Ingresa tu nombre completo";
+    }
+    if (form.childName.trim().length < 2) {
+      nextErrors.childName = "Ingresa el nombre del niño";
+    }
+    if (phoneDigits.length < 10 || phoneDigits.length > 15) {
+      nextErrors.phone = "Ingresa un teléfono de 10 a 15 dígitos";
+    }
+    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      nextErrors.email = "Ingresa un correo válido";
+    }
+    if (!form.consentAccepted) {
+      nextErrors.consentAccepted = "Necesitamos tu autorización para completar el registro";
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!validate()) return;
+
+    setStatus("submitting");
+    setServerMessage("");
+    try {
+      const response = await registerPublicFrequentClient({
+        parentName: form.parentName.trim(),
+        childName: form.childName.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim() || undefined,
+        consentAccepted: form.consentAccepted,
+      });
+      setServerMessage(response.message);
+      setStatus("success");
+    } catch (error) {
+      setServerMessage(
+        error instanceof Error
+          ? error.message
+          : "No pudimos completar tu registro. Inténtalo nuevamente."
+      );
+      setStatus("error");
+    }
+  };
+
+  const startAnotherRegistration = () => {
+    setForm(INITIAL_FREQUENT_CLIENT_FORM);
+    setErrors({});
+    setServerMessage("");
+    setStatus("idle");
+  };
+
   return (
-    <section className="py-24 px-4 bg-gradient-to-b from-base-200 to-base-100">
-      <div className="container mx-auto">
-        <Animate className="text-center mb-16">
-          <SectionBadge className="border-secondary/30 text-secondary">🌟 Clientes Estelares</SectionBadge>
-          <h2 className="text-4xl md:text-5xl font-heading font-bold mt-6 mb-6 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            Familias que confían en nosotros
-          </h2>
-          <p className="text-xl text-base-content/70 max-w-3xl mx-auto">
-            Más de 500 familias han vivido la experiencia Space Kids
+    <section id="clientes-frecuentes" className="sk-loyalty-section">
+      <div className="sk-loyalty-stars" aria-hidden="true" />
+      <div className="sk-loyalty-shell">
+        <Animate from="left" className="sk-loyalty-story">
+          <SectionBadge className="border-yellow-300/30 text-yellow-200">
+            <Crown className="h-4 w-4" /> Tripulación frecuente
+          </SectionBadge>
+          <h2>Tu próxima misión puede traer recompensas</h2>
+          <p className="sk-loyalty-lead">
+            Regístrate en Space Kids y vincula tus próximas visitas al programa de clientes frecuentes.
           </p>
+
+          <div className="sk-loyalty-benefits">
+            <div>
+              <span><Star /></span>
+              <section>
+                <h3>Acumula visitas</h3>
+                <p>Tu perfil podrá registrar el avance de cada compra elegible.</p>
+              </section>
+            </div>
+            <div>
+              <span><Gift /></span>
+              <section>
+                <h3>Desbloquea beneficios</h3>
+                <p>Consulta tus recompensas conforme al programa activo del salón.</p>
+              </section>
+            </div>
+            <div>
+              <span><ShieldCheck /></span>
+              <section>
+                <h3>Registro seguro</h3>
+                <p>Tus datos se envían directamente al sistema de Space Kids.</p>
+              </section>
+            </div>
+          </div>
+
+          <img
+            src="/spacekids/astronautas-exploradores.png"
+            alt="Astronautas de Space Kids explorando juntos"
+            className="sk-loyalty-astronauts"
+            loading="lazy"
+          />
         </Animate>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {frequentClients.map((client, index) => (
-            <Animate key={client.id} from="up" delay={index * 100}>
-              <div className="group relative bg-base-100 rounded-3xl p-6 border border-base-300/30 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 hover:border-secondary/30">
-                {client.isFrequent && (
-                  <div className="absolute -top-3 -right-3 z-10">
-                    <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-yellow-400 to-amber-500 text-[#0A0A1F] text-xs font-bold rounded-full shadow-lg">
-                      <Crown className="w-3 h-3" /> Frecuente
-                    </span>
-                  </div>
+        <Animate from="right" className="sk-loyalty-card">
+          {status === "success" ? (
+            <div className="sk-loyalty-success" role="status" aria-live="polite">
+              <div className="sk-loyalty-success-icon"><Check /></div>
+              <p className="sk-loyalty-kicker">Registro confirmado</p>
+              <h3>¡Bienvenido a la tripulación!</h3>
+              <p>{serverMessage}</p>
+              <div className="sk-loyalty-sms-note">
+                <Phone />
+                <span>La validación mediante código SMS se habilitará en una siguiente etapa.</span>
+              </div>
+              <button type="button" onClick={startAnotherRegistration} className="sk-loyalty-secondary-button">
+                Registrar a otra persona
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} noValidate>
+              <div className="sk-loyalty-card-heading">
+                <span><Rocket /></span>
+                <div>
+                  <p>Alta en tiempo real</p>
+                  <h3>Únete a la tripulación</h3>
+                </div>
+              </div>
+
+              <div className="sk-loyalty-field">
+                <label htmlFor="frequent-parent-name">Nombre completo</label>
+                <div className={errors.parentName ? "has-error" : ""}>
+                  <UserRound aria-hidden="true" />
+                  <input
+                    id="frequent-parent-name"
+                    name="parentName"
+                    type="text"
+                    autoComplete="name"
+                    maxLength={200}
+                    placeholder="Ej. María López"
+                    value={form.parentName}
+                    onChange={(event) => updateField("parentName", event.target.value)}
+                    aria-invalid={Boolean(errors.parentName)}
+                    aria-describedby={errors.parentName ? "frequent-parent-name-error" : undefined}
+                  />
+                </div>
+                {errors.parentName && <p id="frequent-parent-name-error" className="sk-field-error">{errors.parentName}</p>}
+              </div>
+
+              <div className="sk-loyalty-field">
+                <label htmlFor="frequent-child-name">Nombre del niño</label>
+                <div className={errors.childName ? "has-error" : ""}>
+                  <Baby aria-hidden="true" />
+                  <input
+                    id="frequent-child-name"
+                    name="childName"
+                    type="text"
+                    maxLength={150}
+                    placeholder="Ej. Emilio"
+                    value={form.childName}
+                    onChange={(event) => updateField("childName", event.target.value)}
+                    aria-invalid={Boolean(errors.childName)}
+                    aria-describedby={errors.childName ? "frequent-child-name-error" : undefined}
+                  />
+                </div>
+                {errors.childName && <p id="frequent-child-name-error" className="sk-field-error">{errors.childName}</p>}
+              </div>
+
+              <div className="sk-loyalty-field">
+                <label htmlFor="frequent-phone">Teléfono</label>
+                <div className={errors.phone ? "has-error" : ""}>
+                  <Phone aria-hidden="true" />
+                  <input
+                    id="frequent-phone"
+                    name="phone"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    maxLength={24}
+                    placeholder="55 1234 5678"
+                    value={form.phone}
+                    onChange={(event) => updateField("phone", event.target.value)}
+                    aria-invalid={Boolean(errors.phone)}
+                    aria-describedby={errors.phone ? "frequent-phone-error" : "frequent-phone-help"}
+                  />
+                </div>
+                {errors.phone ? (
+                  <p id="frequent-phone-error" className="sk-field-error">{errors.phone}</p>
+                ) : (
+                  <p id="frequent-phone-help" className="sk-field-help">Será el identificador de tu cuenta frecuente.</p>
                 )}
-
-                <div className="relative mb-4">
-                  <div className="w-24 h-24 mx-auto rounded-full overflow-hidden ring-4 ring-primary/20 group-hover:ring-secondary/40 transition-all duration-300">
-                    <img src={client.photo} alt={`${client.name} ${client.familyName}`} className="w-full h-full object-cover" />
-                  </div>
-                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-base-200 px-3 py-0.5 rounded-full text-xs font-medium text-base-content/60">
-                    #{index + 1}
-                  </div>
-                </div>
-
-                <h3 className="text-center font-bold text-lg text-base-content">
-                  {client.name} {client.familyName}
-                </h3>
-
-                <div className="mt-4 space-y-2">
-                  <div className="flex items-center justify-center gap-2 text-sm text-base-content/70">
-                    <Calendar className="w-4 h-4 text-secondary" />
-                    <span>{client.eventsCount} eventos realizados</span>
-                  </div>
-                  <div className="flex items-center justify-center gap-2 text-sm text-base-content/70">
-                    <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                    <span>Cliente {client.isFrequent ? "⭐" : "✓"}</span>
-                  </div>
-                  <div className="flex items-center justify-center gap-2 text-xs text-base-content/40">
-                    <Users className="w-3 h-3" />
-                    <span>Último: {new Date(client.lastEventDate).toLocaleDateString()}</span>
-                  </div>
-                </div>
-
-                <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-primary/5 to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
               </div>
-            </Animate>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
 
-// =====================================================
-// REVIEWS SECTION
-// =====================================================
-
-function ReviewsSection() {
-  const [active, setActive] = useState(0);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setActive((prev) => (prev + 1) % reviewsData.length);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, []);
-
-  return (
-    <section id="resenas" className="py-24 px-4 bg-base-100">
-      <div className="container mx-auto">
-        <Animate className="text-center mb-16">
-          <SectionBadge className="border-primary/30 text-primary">Prueba social</SectionBadge>
-          <h2 className="text-4xl md:text-5xl font-heading font-bold mt-6 mb-6 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            Lo que dicen los padres
-          </h2>
-          <p className="text-xl text-base-content/70 max-w-3xl mx-auto">
-            +500 familias confían en nosotros para sus fiestas espaciales
-          </p>
-        </Animate>
-
-        <Animate>
-          <div className="max-w-4xl mx-auto relative min-h-[350px]">
-            {reviewsData.map((r, i) => (
-              <div
-                key={r.id}
-                className={`absolute inset-0 transition-opacity duration-800 ${i === active ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"}`}
-              >
-                <div className="bg-base-100 border border-primary/30 rounded-3xl p-8 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
-                  <div className="flex items-center gap-4 mb-6">
-                    <img src={r.img} alt={r.name} className={`w-16 h-16 rounded-full object-cover ring-2 ${r.borderColor} ring-offset-2 ring-offset-base-100`} />
-                    <div>
-                      <h4 className="font-bold text-lg text-base-content">{r.name}</h4>
-                      <p className="text-sm text-base-content/50">{r.date}</p>
-                      <div className="flex mt-2 gap-0.5">
-                        {Array.from({ length: r.stars }).map((_, si) => (
-                          <Star key={si} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-base-content/80 text-lg leading-relaxed italic">"{r.text}"</p>
+              <div className="sk-loyalty-field">
+                <label htmlFor="frequent-email">Correo <span>(opcional)</span></label>
+                <div className={errors.email ? "has-error" : ""}>
+                  <Mail aria-hidden="true" />
+                  <input
+                    id="frequent-email"
+                    name="email"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    maxLength={150}
+                    placeholder="tu@correo.com"
+                    value={form.email}
+                    onChange={(event) => updateField("email", event.target.value)}
+                    aria-invalid={Boolean(errors.email)}
+                    aria-describedby={errors.email ? "frequent-email-error" : undefined}
+                  />
                 </div>
+                {errors.email && <p id="frequent-email-error" className="sk-field-error">{errors.email}</p>}
               </div>
-            ))}
-          </div>
 
-          <div className="flex justify-center gap-3 mt-8">
-            {reviewsData.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setActive(i)}
-                className={`h-3 rounded-full transition-all duration-300 ${i === active ? "w-8 bg-secondary shadow-[0_0_15px_var(--s)]" : "w-3 bg-base-content/30 hover:bg-base-content/50"}`}
-              />
-            ))}
-          </div>
+              <label className={`sk-loyalty-consent ${errors.consentAccepted ? "has-error" : ""}`}>
+                <input
+                  type="checkbox"
+                  checked={form.consentAccepted}
+                  onChange={(event) => updateField("consentAccepted", event.target.checked)}
+                  aria-invalid={Boolean(errors.consentAccepted)}
+                  aria-describedby={errors.consentAccepted ? "frequent-consent-error" : undefined}
+                />
+                <span>
+                  Autorizo a Space Kids a usar estos datos para administrar mi participación y contactarme sobre mis beneficios.
+                </span>
+              </label>
+              {errors.consentAccepted && <p id="frequent-consent-error" className="sk-field-error">{errors.consentAccepted}</p>}
+
+              {status === "error" && (
+                <div className="sk-loyalty-server-error" role="alert">{serverMessage}</div>
+              )}
+
+              <button type="submit" className="sk-loyalty-submit" disabled={status === "submitting"}>
+                {status === "submitting" ? (
+                  <><LoaderCircle className="animate-spin" /> Registrando…</>
+                ) : (
+                  <><Rocket /> Quiero ser cliente frecuente</>
+                )}
+              </button>
+              <p className="sk-loyalty-privacy"><ShieldCheck /> No compartimos tus datos con perfiles públicos.</p>
+            </form>
+          )}
         </Animate>
       </div>
     </section>
@@ -1527,12 +1770,12 @@ export default function HomePage() {
       <StarsBackground />
       <HeroSection />
       <StatsSection />
+      <MissionJourneySection />
       <FeaturedExperienceSection />
       <VideoSliderSection />
       <PackagesSection />
       <AvailabilitySection />
       <ClientesFrecuentesSection />
-      <ReviewsSection />
       <ReservationSection />
       <ContactSection />
       <FloatingWhatsAppButton />

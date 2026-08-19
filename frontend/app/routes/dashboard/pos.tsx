@@ -223,7 +223,9 @@ function Modal({
 
     return (
         <dialog className="modal modal-open">
-            <div className={`modal-box rounded-2xl ${maxWidth} p-0 overflow-hidden`}>
+            <div
+                className={`modal-box rounded-2xl ${maxWidth} p-0 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-base-content/20`}
+            >
                 {children}
             </div>
             {closable && (
@@ -1250,8 +1252,8 @@ export default function POS() {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-                <div className="lg:col-span-3 space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 items-start min-w-0">
+                <div className="lg:col-span-3 space-y-4 min-w-0">
                     <div className="relative">
                         <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-base-content/30" />
                         <input
@@ -1296,7 +1298,7 @@ export default function POS() {
                     ) : filtered.length === 0 ? (
                         <EmptyState icon={Package} title="No se encontraron productos" subtitle="Intenta con otra búsqueda" />
                     ) : (
-                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[60dvh] lg:max-h-[calc(100dvh-14rem)] overflow-y-auto overscroll-contain pr-2 pb-2 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-base-content/20">
                             {filtered.map((product) => {
                                 const isAdding = addingProductId === product.publicId;
                                 const config = TYPE_CONFIG[product.type] ?? TYPE_CONFIG.PRODUCT;
@@ -1356,9 +1358,9 @@ export default function POS() {
                     )}
                 </div>
 
-                <div className="lg:col-span-2">
-                    <div className="card bg-base-100 shadow-sm border border-base-300/30 sticky top-20 overflow-hidden">
-                        <div className="flex items-center gap-1 px-4 pt-4 pb-2 overflow-x-auto scrollbar-thin">
+                <div className="lg:col-span-2 min-w-0">
+                    <div className="card bg-base-100 shadow-sm border border-base-300/30 lg:sticky lg:top-20 max-h-[75dvh] lg:max-h-[calc(100dvh-6rem)] overflow-hidden flex flex-col">
+                        <div className="flex shrink-0 items-center gap-1 px-4 pt-4 pb-2 overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-base-content/20">
                             {orderTabs.map((tab) => {
                                 const isActive = tab.id === activeOrderTabId;
                                 const tabActiveItems = tab.order?.items?.filter((i) => i.status === "ACTIVE") ?? [];
@@ -1416,7 +1418,7 @@ export default function POS() {
                             </button>
                         </div>
 
-                        <div className="card-body p-4 pt-2">
+                        <div className="card-body p-4 pt-2 min-h-0 overflow-y-auto overscroll-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-base-content/20">
                             <div className="flex items-center justify-between">
                                 <h3 className="font-bold text-sm">
                                     {order ? "Orden actual" : "Nueva orden"}
@@ -1475,7 +1477,7 @@ export default function POS() {
                                 </div>
                             )}
 
-                            <div className="max-h-64 overflow-y-auto space-y-1 mb-3 -mx-1 px-1">
+                            <div className="space-y-1 mb-3 -mx-1 px-1">
                                 {activeItems.length === 0 && !orderLoading ? (
                                     <div className="flex flex-col items-center justify-center py-10 text-base-content/20 gap-2">
                                         <ShoppingCart className="w-8 h-8" />

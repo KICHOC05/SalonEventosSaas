@@ -48,10 +48,10 @@ export default function EventCard({
   };
 
   return (
-    <div className="group bg-base-100 border border-base-300/20 rounded-xl p-3 flex items-stretch gap-3 hover:border-base-300/50 hover:shadow-sm transition-all">
+    <div className="group bg-base-100 border border-base-300/20 rounded-xl p-3 flex flex-col sm:flex-row sm:items-stretch gap-3 hover:border-base-300/50 hover:shadow-sm transition-all min-w-0">
       {/* Date block */}
       <div
-        className={`shrink-0 w-14 flex flex-col items-center justify-center rounded-lg py-2 ${
+        className={`shrink-0 w-full sm:w-14 flex flex-row sm:flex-col items-center justify-center gap-1 sm:gap-0 rounded-lg py-2 ${
           isToday ? "bg-primary/10 text-primary" : "bg-base-200"
         }`}
       >
@@ -92,7 +92,7 @@ export default function EventCard({
       </div>
 
       {/* Actions */}
-      <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="shrink-0 flex items-center justify-end gap-1 pt-2 sm:pt-0 border-t border-base-300/20 sm:border-t-0 opacity-100 xl:opacity-0 xl:group-hover:opacity-100 transition-opacity">
         <button
           className="btn btn-ghost btn-xs btn-square"
           title="Ver detalle"

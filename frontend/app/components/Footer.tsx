@@ -18,7 +18,6 @@ const exploreLinks = [
 
 const infoLinks = [
   { href: "#disponibilidad", label: "Disponibilidad" },
-  { href: "#resenas", label: "Reseñas" },
   { href: "#reservar", label: "Reservar" },
   { href: "#contacto", label: "Contacto" },
 ];

@@ -81,6 +81,10 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/ws", "/ws/**").permitAll()
                         .requestMatchers("/api/auth/login").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                "/api/public/availability/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST,
+                                "/api/public/frequent-clients/registrations").permitAll()
                         .requestMatchers("/api/auth/register").hasRole("ADMIN")
                         .anyRequest().authenticated())
 

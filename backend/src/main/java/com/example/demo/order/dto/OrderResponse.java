@@ -14,6 +14,7 @@ public class OrderResponse {
 
     private String publicId;
     private Long orderNumber;
+    private String shortCode;
 
     private OrderStatus status;
 
@@ -30,6 +31,10 @@ public class OrderResponse {
     private LocalDateTime closedAt;
 
     private String sellerName;
+    private String sellerPublicId;
+    private String sellerEmail;
+    private String branchPublicId;
+    private String branchName;
 
     private List<String> paymentMethods;
 
@@ -40,5 +45,7 @@ public class OrderResponse {
     private String clientParentName;
 
     private List<OrderItemResponse> items;
+
+    private List<OrderPaymentDetailResponse> payments;
 
 }

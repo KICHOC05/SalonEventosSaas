@@ -3,6 +3,9 @@ package com.example.demo.event.repository;
 import com.example.demo.event.model.EventPayment;
 import com.example.demo.common.enums.PaymentMethod;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -35,4 +38,32 @@ public interface EventPaymentRepository extends JpaRepository<EventPayment, Long
             @Param("cashRegisterId") Long cashRegisterId,
             @Param("paymentMethod") PaymentMethod paymentMethod
     );
+
+    @EntityGraph(attributePaths = {"eventBooking", "branch", "cashRegister"})
+    @Query("""
+        SELECT p FROM EventPayment p
+        WHERE p.tenant.id = :tenantId
+          AND (:branchPublicId IS NULL OR p.branch.publicId = :branchPublicId)
+          AND (:paymentMethod IS NULL OR p.paymentMethod = :paymentMethod)
+          AND (:userPublicId IS NULL OR p.receivedByUserPublicId = :userPublicId)
+          AND (:from IS NULL OR p.paidAt >= :from)
+          AND (:toExclusive IS NULL OR p.paidAt < :toExclusive)
+        ORDER BY p.paidAt DESC, p.id DESC
+    """)
+    Page<EventPayment> findForAudit(
+            @Param("tenantId") Long tenantId,
+            @Param("branchPublicId") String branchPublicId,
+            @Param("paymentMethod") PaymentMethod paymentMethod,
+            @Param("userPublicId") String userPublicId,
+            @Param("from") java.time.LocalDateTime from,
+            @Param("toExclusive") java.time.LocalDateTime toExclusive,
+            Pageable pageable);
+
+    @Query("""
+        SELECT p.cashRegister.id, p.paymentMethod, COALESCE(SUM(p.amount), 0)
+        FROM EventPayment p
+        WHERE p.cashRegister.id IN :cashRegisterIds
+        GROUP BY p.cashRegister.id, p.paymentMethod
+    """)
+    List<Object[]> sumByCashRegisters(@Param("cashRegisterIds") List<Long> cashRegisterIds);
 }

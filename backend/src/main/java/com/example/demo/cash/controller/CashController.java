@@ -135,10 +135,13 @@ public class CashController {
             @RequestParam(required = false) CashMovementType type,
             @RequestParam(required = false) Boolean voided,
             @RequestParam(required = false) String userPublicId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+            @RequestParam(required = false) String branchPublicId,
+            @RequestParam(required = false) String cashRegisterPublicId,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to) {
 
-        return cashService.getMovementHistory(page, size, type, voided, userPublicId, from, to);
+        return cashService.getMovementHistory(page, size, type, voided, userPublicId,
+                branchPublicId, cashRegisterPublicId, from, to);
     }
 
 
@@ -149,10 +152,12 @@ public class CashController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) CashStatus status,
             @RequestParam(required = false) String openedByPublicId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+            @RequestParam(required = false) String branchPublicId,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to) {
 
-        return cashService.getCashRegisterHistory(page, size, status, openedByPublicId, from, to);
+        return cashService.getCashRegisterHistory(page, size, status, openedByPublicId,
+                branchPublicId, from, to);
     }
 
 

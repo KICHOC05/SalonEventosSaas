@@ -19,9 +19,22 @@ export interface StatsResponse {
   averageRating: number;
 }
 
-// ✅ Renombrar para evitar conflicto
 export interface PublicAvailabilityResponse {
-  availableDates: string[];
-  month: string;
-  year: number;
+  from: string;
+  to: string;
+  occupiedDates: string[];
+}
+
+export interface PublicFrequentClientRegistrationRequest {
+  parentName: string;
+  childName: string;
+  phone: string;
+  email?: string;
+  consentAccepted: boolean;
+}
+
+export interface PublicFrequentClientRegistrationResponse {
+  status: "ACTIVE";
+  message: string;
+  phoneVerificationRequired: boolean;
 }

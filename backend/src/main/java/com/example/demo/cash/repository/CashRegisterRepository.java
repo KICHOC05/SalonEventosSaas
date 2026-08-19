@@ -43,18 +43,19 @@ public interface CashRegisterRepository extends JpaRepository<CashRegister, Long
 
     @Query("""
                 SELECT c FROM CashRegister c
-                WHERE c.branch.id = :branchId
+                WHERE c.tenant.id = :tenantId
+                  AND (:branchPublicId IS NULL OR c.branch.publicId = :branchPublicId)
                   AND (:status IS NULL OR c.status = :status)
                   AND (:openedByPublicId IS NULL OR c.openedBy.publicId = :openedByPublicId)
                   AND (CAST(:from AS java.time.LocalDateTime) IS NULL OR c.openedAt >= :from)
-                  AND (CAST(:to AS java.time.LocalDateTime) IS NULL OR c.openedAt <= :to)
-                ORDER BY c.openedAt DESC
+                  AND (CAST(:toExclusive AS java.time.LocalDateTime) IS NULL OR c.openedAt < :toExclusive)
             """)
     Page<CashRegister> findHistoryByBranch(
-            @Param("branchId") Long branchId,
+            @Param("tenantId") Long tenantId,
+            @Param("branchPublicId") String branchPublicId,
             @Param("status") CashStatus status,
             @Param("openedByPublicId") String openedByPublicId,
             @Param("from") LocalDateTime from,
-            @Param("to") LocalDateTime to,
+            @Param("toExclusive") LocalDateTime toExclusive,
             Pageable pageable);
 }

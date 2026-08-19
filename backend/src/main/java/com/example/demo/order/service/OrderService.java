@@ -34,6 +34,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -451,6 +452,7 @@ public class OrderService {
 
         response.setPublicId(order.getPublicId());
         response.setOrderNumber(order.getId());
+        response.setShortCode(formatOrderNumber(order.getId()));
         response.setStatus(order.getStatus());
         response.setCustomerName(order.getCustomerName());
         // REMOVED: order.getChildName() ya no existe en Order
@@ -463,9 +465,14 @@ public class OrderService {
 
         if (order.getUser() != null) {
             response.setSellerName(order.getUser().getName());
+            response.setSellerPublicId(order.getUser().getPublicId());
+            response.setSellerEmail(order.getUser().getEmail());
         }
 
-        List<Payment> payments = paymentRepository.findAllByOrder_Id(order.getId());
+        response.setBranchPublicId(order.getBranch().getPublicId());
+        response.setBranchName(order.getBranch().getName());
+
+        List<Payment> payments = paymentRepository.findAllByOrder_IdOrderByCreatedAtAscIdAsc(order.getId());
         List<String> paymentMethods = payments.stream()
                 .map(Payment::getPaymentMethod)
                 .map(method -> switch (method) {
@@ -476,6 +483,20 @@ public class OrderService {
                 .distinct()
                 .collect(Collectors.toList());
         response.setPaymentMethods(paymentMethods);
+        response.setPayments(payments.stream()
+                .map(payment -> OrderPaymentDetailResponse.builder()
+                        .publicId(payment.getPublicId())
+                        .paymentMethod(payment.getPaymentMethod().name())
+                        .amount(payment.getAmount())
+                        .amountReceived(payment.getAmountReceived())
+                        .changeAmount(payment.getChangeAmount())
+                        .reference(payment.getReference())
+                        .createdAt(payment.getCreatedAt())
+                        .receivedByPublicId(payment.getUser().getPublicId())
+                        .receivedByName(payment.getUser().getName())
+                        .receivedByEmail(payment.getUser().getEmail())
+                        .build())
+                .toList());
 
         Set<String> childNames = new LinkedHashSet<>();
         for (OrderItem item : allItems) {
@@ -497,7 +518,8 @@ public class OrderService {
     @Transactional(readOnly = true)
     public Page<OrderHistoryResponse> getOrderHistory(
             int page, int size,
-            String search, String status,
+            String search, String orderNumber, String status,
+            PaymentMethod paymentMethod, String userPublicId, String branchPublicId,
             String createdAtFrom, String createdAtTo) {
 
         Long tenantId = TenantContext.getTenantId();
@@ -507,32 +529,44 @@ public class OrderService {
             statusEnum = OrderStatus.valueOf(status);
         }
 
-        LocalDateTime from = null;
-        if (createdAtFrom != null && !createdAtFrom.isBlank()) {
-            from = LocalDateTime.parse(createdAtFrom);
-        }
+        LocalDateTime from = parseDateBoundary(createdAtFrom, false);
+        LocalDateTime to = parseDateBoundary(createdAtTo, true);
+        Long numericOrderNumber = parseOrderNumber(orderNumber);
 
-        LocalDateTime to = null;
-        if (createdAtTo != null && !createdAtTo.isBlank()) {
-            to = LocalDateTime.parse(createdAtTo);
-        }
-
-        Pageable pageable = PageRequest.of(page, size);
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        Pageable pageable = PageRequest.of(safePage, safeSize,
+                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
 
         Page<Order> orderPage = orderRepository.findHistoryByTenant(
-                tenantId, statusEnum, from, to, search, pageable);
+                tenantId, blankToNull(branchPublicId), blankToNull(userPublicId),
+                numericOrderNumber, paymentMethod, statusEnum, from, to,
+                blankToNull(search), pageable);
 
-        return orderPage.map(this::mapToHistoryResponse);
+        if (orderPage.isEmpty()) return Page.empty(pageable);
+
+        List<Long> orderIds = orderPage.getContent().stream().map(Order::getId).toList();
+        Map<Long, List<Payment>> paymentsByOrder = paymentRepository.findAllByOrderIds(orderIds)
+                .stream().collect(Collectors.groupingBy(payment -> payment.getOrder().getId()));
+        Map<Long, List<OrderItem>> itemsByOrder = orderItemRepository.findAllByOrderIdsWithProduct(orderIds)
+                .stream().collect(Collectors.groupingBy(item -> item.getOrder().getId()));
+
+        List<OrderHistoryResponse> content = orderPage.getContent().stream()
+                .map(order -> mapToHistoryResponse(
+                        order,
+                        paymentsByOrder.getOrDefault(order.getId(), List.of()),
+                        itemsByOrder.getOrDefault(order.getId(), List.of())))
+                .toList();
+        return new PageImpl<>(content, pageable, orderPage.getTotalElements());
     }
 
-    private OrderHistoryResponse mapToHistoryResponse(Order order) {
+    private OrderHistoryResponse mapToHistoryResponse(
+            Order order, List<Payment> payments, List<OrderItem> allItems) {
         OrderHistoryResponse r = new OrderHistoryResponse();
 
         r.setPublicId(order.getPublicId());
         r.setOrderNumber(order.getId());
-        r.setShortCode(order.getPublicId().length() > 8
-                ? order.getPublicId().substring(0, 8).toUpperCase()
-                : order.getPublicId().toUpperCase());
+        r.setShortCode(formatOrderNumber(order.getId()));
         r.setCreatedAt(order.getCreatedAt());
         r.setClosedAt(order.getClosedAt());
         r.setCustomerName(order.getCustomerName());
@@ -549,9 +583,13 @@ public class OrderService {
 
         if (order.getUser() != null) {
             r.setSellerName(order.getUser().getName());
+            r.setSellerPublicId(order.getUser().getPublicId());
+            r.setSellerEmail(order.getUser().getEmail());
         }
 
-        List<Payment> payments = paymentRepository.findAllByOrder_Id(order.getId());
+        r.setBranchPublicId(order.getBranch().getPublicId());
+        r.setBranchName(order.getBranch().getName());
+
         List<String> paymentMethods = payments.stream()
                 .map(p -> p.getPaymentMethod())
                 .map(method -> switch (method) {
@@ -563,7 +601,6 @@ public class OrderService {
                 .collect(Collectors.toList());
         r.setPaymentMethods(paymentMethods);
 
-        List<OrderItem> allItems = orderItemRepository.findAllByOrder_Id(order.getId());
         List<OrderItem> activeItems = allItems.stream()
                 .filter(i -> i.getStatus() == OrderItemStatus.ACTIVE)
                 .collect(Collectors.toList());
@@ -579,6 +616,31 @@ public class OrderService {
         r.setChildNames(new ArrayList<>(childNames));
 
         return r;
+    }
+
+    private String formatOrderNumber(Long orderNumber) {
+        return "Orden #" + String.format("%06d", orderNumber);
+    }
+
+    private Long parseOrderNumber(String value) {
+        if (value == null || value.isBlank()) return null;
+        String digits = value.replaceAll("[^0-9]", "");
+        if (digits.isBlank()) throw new IllegalArgumentException("Número de orden inválido");
+        return Long.valueOf(digits);
+    }
+
+    private LocalDateTime parseDateBoundary(String value, boolean upperExclusive) {
+        if (value == null || value.isBlank()) return null;
+        if (value.length() == 10) {
+            java.time.LocalDate date = java.time.LocalDate.parse(value);
+            return upperExclusive ? date.plusDays(1).atStartOfDay() : date.atStartOfDay();
+        }
+        LocalDateTime parsed = LocalDateTime.parse(value);
+        return upperExclusive ? parsed.plusNanos(1) : parsed;
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     public List<ActiveSessionResponse> getActiveSessions() {

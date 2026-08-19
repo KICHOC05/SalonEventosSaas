@@ -14,7 +14,11 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "cash_movements")
+@Table(name = "cash_movements", indexes = {
+        @Index(name = "idx_cash_movements_tenant_branch_created", columnList = "tenant_id,branch_id,created_at"),
+        @Index(name = "idx_cash_movements_cash_created", columnList = "cash_register_id,created_at"),
+        @Index(name = "idx_cash_movements_tenant_type_created", columnList = "tenant_id,type,created_at")
+})
 @Getter
 @Setter
 public class CashMovement {

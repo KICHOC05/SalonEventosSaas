@@ -91,7 +91,7 @@ export default function RescheduleEventModal({
 
   return (
     <dialog className="modal modal-open" open>
-      <div className="modal-box max-w-lg">
+      <div className="modal-box max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-base-content/20">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-lg">Reagendar Evento</h3>
           <button className="btn btn-ghost btn-sm btn-square" onClick={onClose}>

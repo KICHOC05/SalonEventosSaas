@@ -16,6 +16,11 @@ public class CashMovementResponse {
     private String reason;
     private String notes;
     private String userName;
+    private String userPublicId;
+    private String userEmail;
+    private String cashRegisterPublicId;
+    private String branchPublicId;
+    private String branchName;
     private LocalDateTime createdAt;
 
     private Boolean voided;

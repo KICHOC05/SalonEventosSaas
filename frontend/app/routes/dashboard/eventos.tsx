@@ -231,7 +231,7 @@ export default function EventosPage() {
   const showEmpty = !loading && filteredEvents.length === 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0">
       <EventPageHeader
         onCreateClick={openNewEvent}
         onRefresh={refreshCalendar}
@@ -248,9 +248,9 @@ export default function EventosPage() {
 
       {/* ===== CALENDARIO SUBMODULE ===== */}
       {activeSubmodule === "calendar" && (
-        <div className="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-6 items-start min-w-0">
           {/* Left: Calendar */}
-          <div>
+          <div className="min-w-0">
             {loading && events.length === 0 ? (
               <div className="bg-base-100 border border-base-300/20 rounded-xl p-8 flex items-center justify-center">
                 <span className="loading loading-spinner loading-md text-primary" />
@@ -268,7 +268,7 @@ export default function EventosPage() {
           </div>
 
           {/* Right: Event list */}
-          <div className="space-y-4">
+          <div className="space-y-4 min-w-0">
             {/* Search & filters */}
             <div className="bg-base-100 border border-base-300/20 rounded-xl p-4 space-y-3">
               <div className="flex items-center gap-2">
@@ -339,7 +339,7 @@ export default function EventosPage() {
                 onCreateClick={openNewEvent}
               />
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-[60dvh] xl:max-h-[calc(100dvh-20rem)] overflow-y-auto overscroll-contain pr-2 pb-1 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-base-content/20">
                 {filteredEvents.map((event) => (
                   <EventCard
                     key={event.publicId}

@@ -19,7 +19,18 @@ public class CashRegisterHistoryResponse {
     private LocalDateTime openedAt;
     private LocalDateTime closedAt;
     private String openedByName;
+    private String openedByPublicId;
+    private String openedByEmail;
     private String closedByName;
+    private String closedByPublicId;
+    private String closedByEmail;
+    private String branchPublicId;
+    private String branchName;
+    private BigDecimal cashSales;
+    private BigDecimal cardSales;
+    private BigDecimal transferSales;
+    private BigDecimal depositTotal;
+    private BigDecimal withdrawalTotal;
     private long orderCount;
     private int movementCount;
 }
