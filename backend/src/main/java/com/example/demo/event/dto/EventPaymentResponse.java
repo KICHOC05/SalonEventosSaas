@@ -26,4 +26,8 @@ public class EventPaymentResponse {
     private String receivedByUserPublicId;
     private String receivedByUserEmail;
     private LocalDateTime paidAt;
+    private BigDecimal previousBalance;
+    private BigDecimal totalPaid;
+    private BigDecimal remainingAmount;
+    private Boolean fullyPaid;
 }

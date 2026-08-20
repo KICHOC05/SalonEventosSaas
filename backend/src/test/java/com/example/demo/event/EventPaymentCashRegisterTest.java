@@ -141,8 +141,9 @@ class EventPaymentCashRegisterTest {
         RegisterEventPaymentRequest request = RegisterEventPaymentRequest.builder()
                 .amount(bd("2000"))
                 .paymentMethod(PaymentMethod.TRANSFER)
+                .reference("SPEI-TEST-2000")
                 .build();
-        eventService.registerEventPayment("event-1", request);
+        var response = eventService.registerEventPayment("event-1", request);
 
         ArgumentCaptor<EventPayment> captor = ArgumentCaptor.forClass(EventPayment.class);
         verify(eventPaymentRepository).save(captor.capture());
@@ -150,6 +151,10 @@ class EventPaymentCashRegisterTest {
         assertEquals(PaymentMethod.TRANSFER, captor.getValue().getPaymentMethod());
         assertAmount("3300", event.getDepositAmount());
         assertAmount("3200", event.getRemainingAmount());
+        assertAmount("5200", response.getPreviousBalance());
+        assertAmount("3300", response.getTotalPaid());
+        assertAmount("3200", response.getRemainingAmount());
+        assertEquals(false, response.getFullyPaid());
     }
 
     @Test
@@ -206,6 +211,7 @@ class EventPaymentCashRegisterTest {
         RegisterEventPaymentRequest request = RegisterEventPaymentRequest.builder()
                 .amount(bd("100"))
                 .paymentMethod(PaymentMethod.CARD)
+                .reference("AUT-TEST-100")
                 .build();
 
         assertThrows(IllegalStateException.class,

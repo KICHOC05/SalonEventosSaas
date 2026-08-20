@@ -1,6 +1,6 @@
-import { Calendar, History, BarChart3 } from "lucide-react";
+import { Calendar, History } from "lucide-react";
 
-export type SubmoduleTab = "calendar" | "history" | "stats";
+export type SubmoduleTab = "calendar" | "history";
 
 interface EventSubmoduleTabsProps {
   active: SubmoduleTab;
@@ -10,7 +10,6 @@ interface EventSubmoduleTabsProps {
 const TABS: { id: SubmoduleTab; label: string; icon: typeof Calendar }[] = [
   { id: "calendar", label: "Calendario", icon: Calendar },
   { id: "history", label: "Historial", icon: History },
-  { id: "stats", label: "Estadísticas", icon: BarChart3 },
 ];
 
 export default function EventSubmoduleTabs({ active, onChange }: EventSubmoduleTabsProps) {

@@ -59,7 +59,6 @@ const NAV_ITEMS: NavItem[] = [
     children: [
       { to: "/dashboard/eventos?tab=calendar", icon: Calendar, label: "Calendario" },
       { to: "/dashboard/eventos?tab=history", icon: History, label: "Historial" },
-      { to: "/dashboard/eventos?tab=stats", icon: BarChart3, label: "Estadísticas" },
     ],
   },
   {

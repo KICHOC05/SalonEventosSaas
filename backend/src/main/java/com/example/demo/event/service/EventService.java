@@ -782,6 +782,13 @@ public class EventService {
             throw new IllegalStateException("No se pueden registrar pagos en eventos completados");
         }
 
+        if (request.getPaymentMethod() != PaymentMethod.CASH
+                && (request.getReference() == null || request.getReference().isBlank())) {
+            throw new IllegalArgumentException(
+                    "La referencia es obligatoria para pagos con tarjeta o transferencia"
+            );
+        }
+
         BigDecimal remaining = event.getEventPrice().subtract(event.getDepositAmount());
 
         if (request.getAmount().compareTo(remaining) > 0) {
@@ -829,7 +836,12 @@ public class EventService {
 
         log.info("Pago registrado para evento {}: ${} con {}", eventPublicId, request.getAmount(), request.getPaymentMethod());
 
-        return mapToPaymentResponse(payment);
+        EventPaymentResponse response = mapToPaymentResponse(payment);
+        response.setPreviousBalance(remaining);
+        response.setTotalPaid(newDeposit);
+        response.setRemainingAmount(event.getRemainingAmount());
+        response.setFullyPaid(event.getRemainingAmount().compareTo(BigDecimal.ZERO) <= 0);
+        return response;
     }
 
     private CashRegister requireOpenCashRegister(Long tenantId, Long branchId) {

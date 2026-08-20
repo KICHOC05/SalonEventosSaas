@@ -127,4 +127,8 @@ export interface EventPaymentResponse {
   receivedByUserPublicId: string;
   receivedByUserEmail: string;
   paidAt: string;
+  previousBalance?: number;
+  totalPaid?: number;
+  remainingAmount?: number;
+  fullyPaid?: boolean;
 }

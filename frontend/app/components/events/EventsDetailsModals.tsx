@@ -1,19 +1,16 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   fetchEventByPublicId, cancelEvent, updateEvent, checkEventAvailability,
   confirmEvent, startEvent, completeEvent,
-  fetchEventPayments, registerEventPayment, getEventTicket, getEventPaymentReceipt,
 } from "~/lib/api";
 import type {
   EventResponse, UpdateEventRequest,
-  RegisterEventPaymentRequest, EventPaymentResponse, EventPaymentMethod,
 } from "~/types/event";
 
 import {
   Pencil, X, Check, Loader2, Calendar, AlertTriangle,
-  Play, DollarSign, ChevronDown, ChevronUp,
+  Play, DollarSign,
   CheckCircle,
-  Printer,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -22,6 +19,7 @@ import {
 } from "~/utils/eventHelpers";
 import ConfirmCancelEventModal from "./ConfirmCancelEventModal";
 import EventTimeline from "./EventTimeline";
+import EventPaymentFlowModal from "./EventPaymentFlowModal";
 
 interface EventsDetailsModalProps {
   publicId: string | null;
@@ -44,32 +42,13 @@ export default function EventsDetailsModal({
   const [saving, setSaving] = useState(false);
   const [showConfirmCancel, setShowConfirmCancel] = useState(false);
   const [availabilityChecking, setAvailabilityChecking] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   const [editForm, setEditForm] = useState<UpdateEventRequest>({});
   const [originalForm, setOriginalForm] = useState<UpdateEventRequest>({});
 
   // Workflow
   const [workflowLoading, setWorkflowLoading] = useState<string | null>(null);
-
-  // Payments
-  const [payments, setPayments] = useState<EventPaymentResponse[]>([]);
-  const [paymentsLoading, setPaymentsLoading] = useState(false);
-  const [showPayments, setShowPayments] = useState(false);
-  const [showPaymentForm, setShowPaymentForm] = useState(false);
-  const [paymentFormAmount, setPaymentFormAmount] = useState(0);
-  const [paymentFormMethod, setPaymentFormMethod] = useState<EventPaymentMethod>("CASH");
-  const [paymentFormReference, setPaymentFormReference] = useState("");
-  const [paymentFormNotes, setPaymentFormNotes] = useState("");
-  const [paymentError, setPaymentError] = useState("");
-  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [paymentRefreshError, setPaymentRefreshError] = useState("");
-  const [ticketError, setTicketError] = useState("");
-  const [ticketLoading, setTicketLoading] = useState(false);
-  const [lastPaymentPublicId, setLastPaymentPublicId] = useState<string | null>(null);
-  const [receiptError, setReceiptError] = useState("");
-  const [receiptLoadingPaymentId, setReceiptLoadingPaymentId] = useState<string | null>(null);
-  const paymentSubmissionInFlight = useRef(false);
 
   // =====================================================
   // CARGAR EVENTO
@@ -203,21 +182,8 @@ export default function EventsDetailsModal({
     setCancelling(false);
     setAvailabilityChecking(false);
     setShowConfirmCancel(false);
+    setShowPaymentModal(false);
     setWorkflowLoading(null);
-    setShowPayments(false);
-    setShowPaymentForm(false);
-    setPaymentFormAmount(0);
-    setPaymentFormReference("");
-    setPaymentFormNotes("");
-    setPaymentError("");
-    setPaymentSuccess(false);
-    setPaymentRefreshError("");
-    setTicketError("");
-    setTicketLoading(false);
-    setLastPaymentPublicId(null);
-    setReceiptError("");
-    setReceiptLoadingPaymentId(null);
-    paymentSubmissionInFlight.current = false;
     setLoading(false);
     onClose();
   };
@@ -317,143 +283,6 @@ export default function EventsDetailsModal({
   const handleStart = () => handleWorkflowAction("start", () => startEvent(event!.publicId));
   const handleComplete = () => handleWorkflowAction("complete", () => completeEvent(event!.publicId));
 
-  // =====================================================
-  // PAYMENT HANDLERS
-  // =====================================================
-
-  const loadPayments = useCallback(async () => {
-    if (!event?.publicId) return;
-    setPaymentsLoading(true);
-    try {
-      const data = await fetchEventPayments(event.publicId);
-      setPayments(data);
-    } catch (error) {
-      console.error("Error al cargar pagos:", error);
-    } finally {
-      setPaymentsLoading(false);
-    }
-  }, [event?.publicId]);
-
-  useEffect(() => {
-    if (event && open) {
-      loadPayments();
-    }
-  }, [event?.publicId, open]);
-
-  const handleRegisterPayment = async () => {
-    setPaymentError("");
-    setPaymentRefreshError("");
-    setTicketError("");
-    setReceiptError("");
-    setLastPaymentPublicId(null);
-    if (paymentSubmissionInFlight.current) return;
-    if (!event || paymentFormAmount <= 0) {
-      setPaymentError("Ingresa un monto válido");
-      return;
-    }
-    if (paymentFormAmount > event.remainingAmount) {
-      setPaymentError("El monto no puede superar el saldo pendiente");
-      return;
-    }
-    paymentSubmissionInFlight.current = true;
-    setPaymentSubmitting(true);
-    try {
-      const createdPayment = await registerEventPayment(event.publicId, {
-        amount: paymentFormAmount,
-        paymentMethod: paymentFormMethod,
-        reference: paymentFormReference.trim() || undefined,
-        notes: paymentFormNotes.trim() || undefined,
-      });
-      setLastPaymentPublicId(createdPayment.publicId);
-    } catch (error: any) {
-      const msg = error.message || "Error al registrar el pago";
-      setPaymentError(msg);
-      toast.error(msg);
-      return;
-    } finally {
-      paymentSubmissionInFlight.current = false;
-      setPaymentSubmitting(false);
-    }
-
-    setPaymentSuccess(true);
-    setShowPaymentForm(false);
-    setPaymentFormAmount(0);
-    setPaymentFormMethod("CASH");
-    setPaymentFormReference("");
-    setPaymentFormNotes("");
-    setPaymentError("");
-
-    try {
-      const updated = await fetchEventByPublicId(event.publicId);
-      setEvent(updated);
-    } catch {
-      setPaymentRefreshError(
-        "El pago fue registrado, pero no se pudieron actualizar los montos. Cierra y vuelve a abrir el evento para consultarlos."
-      );
-    }
-
-    await loadPayments();
-    onUpdated();
-  };
-
-  const handlePrintEventTicket = async () => {
-    if (!event || ticketLoading) return;
-    setTicketError("");
-    setTicketLoading(true);
-    try {
-      const html = await getEventTicket(event.publicId);
-      const win = window.open("", "_blank", "width=400,height=600");
-      if (win) {
-        win.onload = () => {
-          win.focus();
-          win.print();
-        };
-        win.document.open();
-        win.document.write(html);
-        win.document.close();
-      } else {
-        const message = "No se pudo abrir la ventana de impresión. Verifica que el navegador permita ventanas emergentes para este sitio.";
-        setTicketError(message);
-        toast.error(message);
-      }
-    } catch {
-      const message = "No se pudo cargar el ticket. Puedes intentar imprimirlo nuevamente.";
-      setTicketError(message);
-      toast.error(message);
-    } finally {
-      setTicketLoading(false);
-    }
-  };
-
-  const handlePrintPaymentReceipt = async (paymentPublicId: string) => {
-    if (!event || receiptLoadingPaymentId) return;
-    setReceiptError("");
-    setReceiptLoadingPaymentId(paymentPublicId);
-    try {
-      const html = await getEventPaymentReceipt(event.publicId, paymentPublicId);
-      const win = window.open("", "_blank", "width=400,height=600");
-      if (win) {
-        win.onload = () => {
-          win.focus();
-          win.print();
-        };
-        win.document.open();
-        win.document.write(html);
-        win.document.close();
-      } else {
-        const message = "No se pudo abrir la ventana de impresión. Verifica que el navegador permita ventanas emergentes para este sitio.";
-        setReceiptError(message);
-        toast.error(message);
-      }
-    } catch {
-      const message = "No se pudo cargar el recibo. Puedes intentar imprimirlo nuevamente.";
-      setReceiptError(message);
-      toast.error(message);
-    } finally {
-      setReceiptLoadingPaymentId(null);
-    }
-  };
-
   // ✅ DESPUÉS DE TODOS LOS HOOKS, AQUÍ VAN LOS RETURNS CONDICIONALES
 
   // Si el modal está cerrado, NO renderizar nada
@@ -541,7 +370,8 @@ export default function EventsDetailsModal({
 
   return (
     <>
-      <dialog className="modal modal-open" open>
+      {!showPaymentModal && (
+        <dialog className="modal modal-open" open>
         <div className="modal-box max-w-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-base-content/20">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -756,7 +586,7 @@ export default function EventsDetailsModal({
                   <p className="font-medium">{formatCurrency(event!.eventPrice)}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-base-content/60">Anticipo</p>
+                  <p className="text-sm text-base-content/60">Total pagado</p>
                   <p className="font-medium">{formatCurrency(event!.depositAmount)}</p>
                 </div>
                 <div>
@@ -778,7 +608,7 @@ export default function EventsDetailsModal({
                     </p>
                   </div>
                   <div className="text-center">
-                    <p className="text-xs text-base-content/50">Anticipo</p>
+                    <p className="text-xs text-base-content/50">Total pagado</p>
                     <p className="text-sm font-bold text-success">
                       {formatCurrency(event!.depositAmount)}
                     </p>
@@ -800,6 +630,16 @@ export default function EventsDetailsModal({
                     {Math.min(depositPercent, 100).toFixed(0)}% pagado
                   </p>
                 </div>
+                {!isEditing && (
+                  <button
+                    type="button"
+                    className={`btn w-full mt-4 gap-2 ${event!.remainingAmount <= 0 ? "btn-success btn-outline" : "btn-primary"}`}
+                    onClick={() => setShowPaymentModal(true)}
+                  >
+                    <DollarSign className="w-4 h-4" />
+                    {event!.remainingAmount <= 0 ? "Ver pagos y comprobantes" : "Registrar o consultar pagos"}
+                  </button>
+                )}
               </div>
 
               {/* Timeline */}
@@ -876,264 +716,6 @@ export default function EventsDetailsModal({
                 )}
               </div>
 
-              {/* Payment Section */}
-              <div className="mt-6">
-                <div
-                  className="flex items-center justify-between cursor-pointer p-3 bg-base-200 rounded-xl hover:bg-base-300/50 transition-colors"
-                  onClick={() => setShowPayments(!showPayments)}
-                >
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="w-4 h-4 text-base-content/60" />
-                    <span className="font-semibold text-sm">Pagos registrados</span>
-                    <span className="badge badge-sm">{payments.length}</span>
-                  </div>
-                  {showPayments ? (
-                    <ChevronUp className="w-4 h-4 text-base-content/40" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-base-content/40" />
-                  )}
-                </div>
-
-                {showPayments && (
-                  <div className="mt-3 space-y-3">
-                    {paymentsLoading ? (
-                      <div className="flex items-center justify-center py-4">
-                        <Loader2 className="w-5 h-5 animate-spin text-base-content/40" />
-                      </div>
-                    ) : payments.length === 0 ? (
-                      <p className="text-sm text-base-content/40 text-center py-4">
-                        No hay pagos registrados
-                      </p>
-                    ) : (
-                      <div className="space-y-2">
-                        {payments.map((p) => (
-                          <div
-                            key={p.publicId}
-                            className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-base-200/50 rounded-xl"
-                          >
-                            <div>
-                              <p className="text-sm font-medium">{formatCurrency(p.amount)}</p>
-                              <p className="text-xs text-base-content/40">
-                                {p.paymentMethod === "CASH" ? "Efectivo" : p.paymentMethod === "CARD" ? "Tarjeta" : "Transferencia"} &bull; {formatDate(p.paidAt)}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-xs gap-1 self-stretch sm:self-auto"
-                              onClick={() => handlePrintPaymentReceipt(p.publicId)}
-                              disabled={receiptLoadingPaymentId !== null}
-                            >
-                              {receiptLoadingPaymentId === p.publicId ? (
-                                <><Loader2 className="w-3 h-3 animate-spin" /> Cargando...</>
-                              ) : (
-                                <><Printer className="w-3 h-3" /> Imprimir recibo</>
-                              )}
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {paymentSuccess ? (
-                      <div className="bg-success/10 border border-success/20 rounded-xl p-4 space-y-3">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="w-5 h-5 text-success" />
-                          <span className="font-bold text-success text-sm">Pago registrado correctamente</span>
-                        </div>
-                        {!paymentRefreshError && event && event.remainingAmount <= 0 && (
-                          <div className="bg-success/20 rounded-lg px-3 py-2 text-center">
-                            <span className="font-extrabold text-success">EVENTO LIQUIDADO</span>
-                          </div>
-                        )}
-                        {paymentRefreshError ? (
-                          <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 text-xs text-warning">
-                            {paymentRefreshError}
-                          </div>
-                        ) : (
-                          <div className="space-y-1 text-sm">
-                            <div className="flex justify-between gap-4">
-                              <span className="text-base-content/60">Total pagado</span>
-                              <span className="font-bold">{event ? formatCurrency(event.depositAmount) : "—"}</span>
-                            </div>
-                            <div className="flex justify-between gap-4">
-                              <span className="text-base-content/60">Saldo restante</span>
-                              <span className={`font-bold ${event && event.remainingAmount <= 0 ? "text-success" : "text-warning"}`}>
-                                {event ? formatCurrency(event.remainingAmount) : "—"}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                        {ticketError && (
-                          <div className="bg-error/10 border border-error/30 rounded-lg p-3 text-xs text-error">
-                            {ticketError}
-                          </div>
-                        )}
-                        {receiptError && (
-                          <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 text-xs text-warning">
-                            ⚠ {receiptError}
-                          </div>
-                        )}
-                        <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                          <button
-                            type="button"
-                            className="btn btn-outline btn-sm flex-1 gap-1.5"
-                            onClick={() => lastPaymentPublicId && handlePrintPaymentReceipt(lastPaymentPublicId)}
-                            disabled={!lastPaymentPublicId || receiptLoadingPaymentId !== null}
-                          >
-                            {receiptLoadingPaymentId === lastPaymentPublicId ? (
-                              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Cargando recibo...</>
-                            ) : (
-                              <><Printer className="w-3.5 h-3.5" /> Imprimir recibo</>
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-outline btn-sm flex-1 gap-1.5"
-                            onClick={handlePrintEventTicket}
-                            disabled={ticketLoading}
-                          >
-                            {ticketLoading ? (
-                              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Cargando ticket...</>
-                            ) : (
-                              <><Printer className="w-3.5 h-3.5" /> Imprimir ticket completo</>
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm flex-1"
-                            onClick={() => {
-                              setPaymentSuccess(false);
-                              setPaymentRefreshError("");
-                              setTicketError("");
-                              setReceiptError("");
-                              setLastPaymentPublicId(null);
-                            }}
-                          >
-                            Cerrar
-                          </button>
-                        </div>
-                      </div>
-                    ) : !showPaymentForm ? (
-                      <div className="space-y-2">
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm w-full gap-2"
-                          onClick={() => {
-                            setShowPaymentForm(true);
-                            setPaymentError("");
-                            setTicketError("");
-                            setReceiptError("");
-                          }}
-                        >
-                          <DollarSign className="w-4 h-4" /> Registrar pago
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm w-full gap-1.5"
-                          onClick={handlePrintEventTicket}
-                          disabled={ticketLoading}
-                        >
-                          {ticketLoading ? (
-                            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Cargando ticket...</>
-                          ) : (
-                            <><Printer className="w-3.5 h-3.5" /> Imprimir ticket</>
-                          )}
-                        </button>
-                        {ticketError && (
-                          <div className="bg-error/10 border border-error/30 rounded-lg p-3 text-xs text-error">
-                            {ticketError}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="p-3 bg-base-200 rounded-xl space-y-3">
-                        <p className="text-xs font-semibold text-base-content/40 uppercase tracking-wider">
-                          Nuevo pago
-                        </p>
-                        <div className="form-control">
-                          <label className="label py-1">
-                            <span className="label-text font-medium">Monto *</span>
-                          </label>
-                          <input
-                            type="number"
-                            value={paymentFormAmount || ""}
-                            onChange={(e) => setPaymentFormAmount(parseFloat(e.target.value) || 0)}
-                            className="input input-bordered input-sm"
-                            min="0"
-                            step="0.01"
-                            placeholder={`Máx: ${formatCurrency(event!.remainingAmount)}`}
-                          />
-                        </div>
-                        <div className="form-control">
-                          <label className="label py-1">
-                            <span className="label-text font-medium">Método de pago</span>
-                          </label>
-                          <select
-                            value={paymentFormMethod}
-                            onChange={(e) => setPaymentFormMethod(e.target.value as EventPaymentMethod)}
-                            className="select select-bordered select-sm"
-                          >
-                            <option value="CASH">Efectivo</option>
-                            <option value="CARD">Tarjeta</option>
-                            <option value="TRANSFER">Transferencia</option>
-                          </select>
-                        </div>
-                        <div className="form-control">
-                          <label className="label py-1">
-                            <span className="label-text font-medium">Referencia (opcional)</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={paymentFormReference}
-                            onChange={(e) => setPaymentFormReference(e.target.value)}
-                            className="input input-bordered input-sm"
-                            placeholder="Nº de referencia"
-                          />
-                        </div>
-                        <div className="form-control">
-                          <label className="label py-1">
-                            <span className="label-text font-medium">Notas (opcional)</span>
-                          </label>
-                          <textarea
-                            value={paymentFormNotes}
-                            onChange={(e) => setPaymentFormNotes(e.target.value)}
-                            className="textarea textarea-bordered textarea-sm"
-                            rows={2}
-                            placeholder="Notas del pago"
-                          />
-                        </div>
-                        {paymentError && (
-                          <div className="bg-error/10 border border-error/30 rounded-lg p-3">
-                            <p className="text-error text-xs font-medium">{paymentError}</p>
-                          </div>
-                        )}
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm flex-1"
-                            onClick={() => { setShowPaymentForm(false); setPaymentFormAmount(0); setPaymentFormReference(""); setPaymentFormNotes(""); setPaymentError(""); }}
-                            disabled={paymentSubmitting}
-                          >
-                            Cancelar
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-primary btn-sm flex-1"
-                            onClick={handleRegisterPayment}
-                            disabled={paymentSubmitting || paymentFormAmount <= 0}
-                          >
-                            {paymentSubmitting ? (
-                              <><Loader2 className="w-3 h-3 animate-spin" /> Registrando...</>
-                            ) : (
-                              "Registrar pago"
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
             </>
           )}
 
@@ -1209,7 +791,8 @@ export default function EventsDetailsModal({
         <form method="dialog" className="modal-backdrop">
           <button onClick={handleClose}>Cerrar</button>
         </form>
-      </dialog>
+        </dialog>
+      )}
 
       {/* Modal de confirmación de cancelación */}
       <ConfirmCancelEventModal
@@ -1219,6 +802,20 @@ export default function EventsDetailsModal({
         eventName={event!.childName}
         loading={cancelling}
       />
+
+      {event && (
+        <EventPaymentFlowModal
+          event={event}
+          open={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          onPaymentRegistered={(updatedEvent) => {
+            setEvent(updatedEvent);
+            setEditForm((current) => ({ ...current, depositAmount: updatedEvent.depositAmount }));
+            setOriginalForm((current) => ({ ...current, depositAmount: updatedEvent.depositAmount }));
+            onUpdated();
+          }}
+        />
+      )}
 
     </>
   );

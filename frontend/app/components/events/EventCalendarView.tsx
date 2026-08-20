@@ -1,9 +1,5 @@
-import { useRef, useCallback, useEffect } from "react";
-import FullCalendar from "@fullcalendar/react";
-import dayGridPlugin from "@fullcalendar/daygrid";
-import timeGridPlugin from "@fullcalendar/timegrid";
-import interactionPlugin from "@fullcalendar/interaction";
-import esLocale from "@fullcalendar/core/locales/es";
+import { useMemo, useState } from "react";
+import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { getStatusColor } from "~/utils/eventHelpers";
 
 interface CalendarEventBase {
@@ -18,19 +14,19 @@ interface CalendarEventBase {
 
 interface EventCalendarViewProps {
   events: CalendarEventBase[];
+  loading?: boolean;
   onDateClick: (date: string) => void;
-  onEventClick: (event: CalendarEventBase) => void;
-  onViewChange: (view: string) => void;
-  onDatesSet?: (gridStart: Date, gridEnd: Date, currentStart: Date, currentEnd: Date) => void;
+  onMonthChange: (startDate: Date, endDate: Date) => void;
   selectedDate?: string;
 }
 
-function formatLocalDate(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+interface CalendarDay {
+  day: number;
+  dateStr?: string;
+  events: CalendarEventBase[];
 }
+
+const WEEK_DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
 const STATUS_PRIORITY: Record<string, number> = {
   IN_PROGRESS: 1,
@@ -40,193 +36,273 @@ const STATUS_PRIORITY: Record<string, number> = {
   CANCELLED: 5,
 };
 
-function topStatus(dayEvents: { status: string }[]): string {
+const STATUS_LABELS: Record<string, string> = {
+  PENDING_DEPOSIT: "Pendiente",
+  CONFIRMED: "Confirmado",
+  IN_PROGRESS: "En progreso",
+  COMPLETED: "Completado",
+  CANCELLED: "Cancelado",
+};
+
+const LEGEND_ITEMS = [
+  "PENDING_DEPOSIT",
+  "CONFIRMED",
+  "IN_PROGRESS",
+  "COMPLETED",
+  "CANCELLED",
+];
+
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function eventDateOnly(value: string): string {
+  return value.split("T")[0];
+}
+
+function topStatus(dayEvents: CalendarEventBase[]): string {
   if (dayEvents.length === 0) return "";
-  return dayEvents.reduce((a, b) =>
-    (STATUS_PRIORITY[a.status] ?? 99) < (STATUS_PRIORITY[b.status] ?? 99) ? a : b
+  return dayEvents.reduce((current, candidate) =>
+    (STATUS_PRIORITY[current.status] ?? 99) <= (STATUS_PRIORITY[candidate.status] ?? 99)
+      ? current
+      : candidate
   ).status;
 }
 
-function renderIndicators(frame: HTMLElement, dayEvents: CalendarEventBase[], dateStr: string, selectedDate?: string) {
-  frame.querySelectorAll(".day-status-indicators").forEach((el) => el.remove());
-
-  if (dayEvents.length > 0) {
-    const top = topStatus(dayEvents);
-    const color = getStatusColor(top);
-    frame.style.backgroundColor = `${color}0D`;
-
-    const indicators = document.createElement("div");
-    indicators.className = "day-status-indicators flex justify-center gap-0.5 mt-0.5";
-    indicators.style.pointerEvents = "none";
-
-    const maxDots = Math.min(dayEvents.length, 3);
-    for (let i = 0; i < maxDots; i++) {
-      const dot = document.createElement("span");
-      dot.className = "day-dot";
-      dot.style.backgroundColor = getStatusColor(dayEvents[i].status);
-      dot.style.width = "8px";
-      dot.style.height = "8px";
-      dot.style.borderRadius = "50%";
-      dot.style.display = "inline-block";
-      dot.style.flexShrink = "0";
-      dot.style.border = "1px solid rgba(255,255,255,0.3)";
-      indicators.appendChild(dot);
-    }
-
-    if (dayEvents.length > 3) {
-      const more = document.createElement("span");
-      more.className = "day-dot-more";
-      more.textContent = `+${dayEvents.length - 3}`;
-      more.style.fontSize = "9px";
-      more.style.color = "var(--color-base-content)";
-      more.style.opacity = "0.6";
-      more.style.marginLeft = "2px";
-      indicators.appendChild(more);
-    }
-
-    frame.appendChild(indicators);
-  } else {
-    frame.style.backgroundColor = "";
-  }
-
-  if (dateStr === selectedDate) {
-    frame.style.boxShadow = "inset 0 0 0 2px var(--color-primary)";
-    frame.style.borderRadius = "8px";
-  } else {
-    frame.style.boxShadow = "";
-  }
+function monthRange(month: Date): { start: Date; end: Date } {
+  return {
+    start: new Date(month.getFullYear(), month.getMonth(), 1),
+    end: new Date(month.getFullYear(), month.getMonth() + 1, 0),
+  };
 }
 
 export default function EventCalendarView({
   events,
+  loading = false,
   onDateClick,
-  onEventClick,
-  onViewChange,
-  onDatesSet,
+  onMonthChange,
   selectedDate,
 }: EventCalendarViewProps) {
-  const calendarRef = useRef<FullCalendar>(null);
-  const eventsRef = useRef(events);
-  eventsRef.current = events;
+  const initialMonth = useMemo(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  }, []);
+  const [visibleMonth, setVisibleMonth] = useState(initialMonth);
+  const todayStr = useMemo(() => formatLocalDate(new Date()), []);
 
-  const dayFramesRef = useRef<Map<string, HTMLElement>>(new Map());
+  const monthLabel = useMemo(() => {
+    const label = new Intl.DateTimeFormat("es-MX", {
+      month: "long",
+      year: "numeric",
+    }).format(visibleMonth);
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }, [visibleMonth]);
 
-  useEffect(() => {
-    dayFramesRef.current.forEach((frame, dateStr) => {
-      const dayEvents = eventsRef.current.filter((e) => e.eventDate === dateStr);
-      renderIndicators(frame, dayEvents, dateStr, selectedDate);
+  const calendarDays = useMemo<CalendarDay[]>(() => {
+    const year = visibleMonth.getFullYear();
+    const month = visibleMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const leadingEmptyDays = (firstDay.getDay() + 6) % 7;
+    const eventsByDate = new Map<string, CalendarEventBase[]>();
+
+    events.forEach((event) => {
+      const date = eventDateOnly(event.eventDate);
+      const dayEvents = eventsByDate.get(date) ?? [];
+      dayEvents.push(event);
+      eventsByDate.set(date, dayEvents);
     });
-  }, [events, selectedDate]);
 
-  const calendarEvents = events.map((event) => {
-    const color = getStatusColor(event.status);
-    return {
-      id: event.publicId,
-      title: `${event.childName || event.customerName}`,
-      start: `${event.eventDate}T${event.startTime}`,
-      end: `${event.eventDate}T${event.endTime}`,
-      backgroundColor: color,
-      borderColor: color,
-      textColor: "#fff",
-      extendedProps: { event },
-    };
-  });
+    const days: CalendarDay[] = Array.from({ length: leadingEmptyDays }, () => ({
+      day: 0,
+      events: [],
+    }));
 
-  const handleEventClick = useCallback(
-    (info: any) => {
-      onEventClick(info.event.extendedProps.event as CalendarEventBase);
-    },
-    [onEventClick]
-  );
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const dateStr = formatLocalDate(new Date(year, month, day));
+      days.push({
+        day,
+        dateStr,
+        events: eventsByDate.get(dateStr) ?? [],
+      });
+    }
 
-  const handleDateClick = useCallback(
-    (info: any) => {
-      onDateClick(info.dateStr);
-    },
-    [onDateClick]
-  );
+    return days;
+  }, [events, visibleMonth]);
 
-  const handleDatesSet = useCallback(
-    (info: any) => {
-      if (onDatesSet && info.start && info.end && info.view) {
-        onDatesSet(info.start, info.end, info.view.currentStart, info.view.currentEnd);
-      }
-    },
-    [onDatesSet]
-  );
+  const changeMonth = (offset: number) => {
+    const nextMonth = new Date(
+      visibleMonth.getFullYear(),
+      visibleMonth.getMonth() + offset,
+      1
+    );
+    setVisibleMonth(nextMonth);
+    const range = monthRange(nextMonth);
+    onMonthChange(range.start, range.end);
+  };
 
-  const legendItems = [
-    { label: "Pendiente", status: "PENDING_DEPOSIT" },
-    { label: "Confirmado", status: "CONFIRMED" },
-    { label: "En progreso", status: "IN_PROGRESS" },
-    { label: "Completado", status: "COMPLETED" },
-    { label: "Cancelado", status: "CANCELLED" },
-  ];
+  const goToCurrentMonth = () => {
+    setVisibleMonth(initialMonth);
+    const range = monthRange(initialMonth);
+    onMonthChange(range.start, range.end);
+  };
+
+  const isCurrentMonth =
+    visibleMonth.getFullYear() === initialMonth.getFullYear() &&
+    visibleMonth.getMonth() === initialMonth.getMonth();
 
   return (
-    <div className="bg-base-100 border border-base-300/20 rounded-xl overflow-hidden">
-      <div className="[&_.fc-theme-standard]:!border-transparent [&_.fc-scrollgrid]:!border-transparent [&_.fc-scrollgrid-section>td]:!border-transparent [&_.fc-col-header-cell]:!border-base-300/20 [&_.fc-daygrid-day]:!border-base-300/10 [&_.fc-daygrid-day-top]:!justify-center [&_.fc-daygrid-day-number]:!text-sm [&_.fc-daygrid-day-number]:!font-semibold [&_.fc-daygrid-day-number]:!p-1.5 [&_.fc-daygrid-day-events]:!hidden [&_.fc-daygrid-more-link]:!text-[10px] [&_.fc-daygrid-more-link]:!text-primary [&_.fc-daygrid-more-link]:!font-medium [&_.fc-daygrid-day-frame]:!min-h-[4.5rem] [&_.fc-daygrid-day-frame]:!p-1 [&_.fc-header-toolbar]:!mb-2 [&_.fc-header-toolbar]:!px-2 [&_.fc-header-toolbar]:!pt-1 [&_.fc-toolbar-title]:!text-base [&_.fc-button]:!h-8 [&_.fc-button]:!text-xs [&_.fc-button]:!rounded-lg [&_.fc-button-primary]:!bg-base-200 [&_.fc-button-primary]:!text-base-content [&_.fc-button-primary]:!border-base-300/20 [&_.fc-button-primary:hover]:!bg-base-300 [&_.fc-button-primary:not(:disabled).fc-button-active]:!bg-primary [&_.fc-button-primary:not(:disabled).fc-button-active]:!text-primary-content [&_.fc-day-today]:!bg-primary/[0.06] [&_.fc-day-today_.fc-daygrid-day-number]:!text-primary [&_.fc-day-today_.fc-daygrid-day-number]:!font-bold [&_.fc-daygrid-day]:!cursor-pointer [&_.fc-daygrid-day:hover]:!bg-base-200/60 [&_.fc-scrollgrid]:!rounded-lg [&_.fc-theme-standard]:!rounded-lg [&_.fc-col-header]:!bg-base-200/40 [&_.fc-scrollgrid]:!bg-base-200/20 [&_.fc-scrollgrid-sync-table]:!bg-transparent [&_.fc-theme-standard td]:!bg-transparent [&_.fc-col-header-cell]:!text-xs [&_.fc-col-header-cell]:!font-semibold [&_.fc-col-header-cell]:!text-base-content/50 [&_.fc-col-header-cell]:!uppercase [&_.fc-col-header-cell]:!tracking-wider [&_.fc-col-header-cell]:!py-2 [&_.fc-daygrid-body]:!rounded-lg [&_.fc-daygrid-body-unbalanced]:!rounded-lg]">
-      <div className="p-3">
-        <FullCalendar
-          ref={calendarRef}
-          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-          initialView="dayGridMonth"
-          locale={esLocale}
-          headerToolbar={{
-            left: "prev,next today",
-            center: "title",
-            right: "dayGridMonth,timeGridWeek",
-          }}
-          events={calendarEvents}
-          eventClick={handleEventClick}
-          dateClick={handleDateClick}
-          datesSet={handleDatesSet}
-          viewDidMount={(info) => onViewChange(info.view.type)}
-          height="auto"
-          contentHeight="auto"
-          dayMaxEvents={2}
-          moreLinkText={(num) => `+${num}`}
-          noEventsText=""
-          eventDisplay="none"
-          displayEventTime={false}
-          dayCellClassNames={(arg) => {
-            const dateStr = formatLocalDate(arg.date);
-            const dayEvents = events.filter((e) => e.eventDate === dateStr);
-            const cls = [];
-            if (dayEvents.length > 0) cls.push("has-events");
-            if (dateStr === selectedDate) cls.push("selected-day");
-            return cls.join(" ");
-          }}
-          dayCellDidMount={(arg) => {
-            const dateStr = formatLocalDate(arg.date);
-            const frame = arg.el.querySelector(".fc-daygrid-day-frame") as HTMLElement;
-            if (!frame) return;
-            dayFramesRef.current.set(dateStr, frame);
-            const dayEvents = eventsRef.current.filter((e) => e.eventDate === dateStr);
-            renderIndicators(frame, dayEvents, dateStr, selectedDate);
-          }}
-          buttonText={{
-            today: "Hoy",
-            month: "Mes",
-            week: "Semana",
-            day: "D\u00eda",
-          }}
-        />
-      </div>
+    <div className="bg-base-100 border border-primary/20 rounded-2xl p-4 sm:p-6 shadow-sm min-w-0">
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-2 text-base sm:text-lg font-bold capitalize truncate">
+            <CalendarDays className="w-5 h-5 text-primary shrink-0" />
+            {monthLabel}
+          </h2>
+          <p className="text-xs sm:text-sm text-base-content/50 mt-0.5">
+            {loading
+              ? "Consultando agenda…"
+              : `${events.length} evento${events.length === 1 ? "" : "s"} registrado${events.length === 1 ? "" : "s"}`}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => changeMonth(-1)}
+            disabled={loading}
+            aria-label="Ver mes anterior"
+            className="btn btn-sm btn-square btn-ghost border border-base-300/30 rounded-full"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={goToCurrentMonth}
+            disabled={loading || isCurrentMonth}
+            className="btn btn-sm btn-ghost border border-base-300/30 rounded-full px-3 hidden sm:inline-flex"
+          >
+            Hoy
+          </button>
+          <button
+            type="button"
+            onClick={() => changeMonth(1)}
+            disabled={loading}
+            aria-label="Ver mes siguiente"
+            className="btn btn-sm btn-square btn-ghost border border-base-300/30 rounded-full"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap items-center justify-center gap-3 px-4 py-3 border-t border-base-300/10 mt-1">
-        {legendItems.map((item) => (
-          <div key={item.status} className="flex items-center gap-1.5">
-            <span
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: getStatusColor(item.status) }}
-            />
-            <span className="text-[11px] text-base-content/60">{item.label}</span>
+      <div className="grid grid-cols-7 gap-1.5 sm:gap-2 mb-3">
+        {WEEK_DAYS.map((weekday) => (
+          <div
+            key={weekday}
+            className="text-center text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-base-content/45"
+          >
+            {weekday}
           </div>
         ))}
       </div>
+
+      <div
+        className={`relative grid grid-cols-7 gap-1.5 sm:gap-2 transition-opacity ${loading ? "opacity-45" : "opacity-100"}`}
+        aria-busy={loading}
+      >
+        {calendarDays.map((calendarDay, index) => {
+          if (!calendarDay.dateStr) {
+            return <div key={`empty-${index}`} className="aspect-square" />;
+          }
+
+          const dayEvents = calendarDay.events;
+          const status = topStatus(dayEvents);
+          const statusColor = status ? getStatusColor(status) : "";
+          const isSelected = selectedDate === calendarDay.dateStr;
+          const isPast = calendarDay.dateStr < todayStr;
+          const statusSummary = Array.from(new Set(dayEvents.map((event) => STATUS_LABELS[event.status] ?? event.status))).join(", ");
+          const accessibleLabel = dayEvents.length > 0
+            ? `${calendarDay.dateStr}: ${dayEvents.length} evento${dayEvents.length === 1 ? "" : "s"}, ${statusSummary}`
+            : `${calendarDay.dateStr}: disponible, crear evento`;
+
+          return (
+            <button
+              type="button"
+              key={calendarDay.dateStr}
+              onClick={() => onDateClick(calendarDay.dateStr!)}
+              disabled={loading}
+              aria-label={accessibleLabel}
+              aria-pressed={isSelected}
+              title={accessibleLabel}
+              className={`group relative aspect-square min-h-10 rounded-xl border flex items-center justify-center text-xs sm:text-sm font-semibold transition-all
+                ${dayEvents.length > 0
+                  ? "hover:scale-95 shadow-sm"
+                  : "bg-base-200/60 border-base-300/30 hover:bg-base-300/50"
+                }
+                ${isPast && dayEvents.length === 0 ? "text-base-content/30" : "text-base-content/80"}
+                ${isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-base-100 scale-95" : ""}
+              `}
+              style={dayEvents.length > 0 ? {
+                backgroundColor: `${statusColor}1F`,
+                borderColor: statusColor,
+              } : undefined}
+            >
+              <span>{calendarDay.day}</span>
+
+              {dayEvents.length > 0 && (
+                <>
+                  <div className="absolute bottom-1 sm:bottom-1.5 left-1/2 -translate-x-1/2 flex items-center gap-0.5">
+                    {dayEvents.slice(0, 3).map((event) => (
+                      <span
+                        key={event.publicId}
+                        className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full border border-white/40"
+                        style={{ backgroundColor: getStatusColor(event.status) }}
+                      />
+                    ))}
+                  </div>
+                  {dayEvents.length > 1 && (
+                    <span
+                      className="absolute top-1 right-1 min-w-4 h-4 px-1 rounded-full text-[9px] leading-4 text-white font-bold"
+                      style={{ backgroundColor: statusColor }}
+                    >
+                      {dayEvents.length}
+                    </span>
+                  )}
+                </>
+              )}
+            </button>
+          );
+        })}
+
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <span className="loading loading-spinner loading-md text-primary" aria-label="Cargando eventos" />
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-x-4 gap-y-2 mt-6 pt-4 border-t border-base-300/20">
+        {LEGEND_ITEMS.map((status) => (
+          <div key={status} className="flex items-center gap-1.5">
+            <span
+              className="w-3 h-3 rounded border"
+              style={{
+                backgroundColor: `${getStatusColor(status)}33`,
+                borderColor: getStatusColor(status),
+              }}
+            />
+            <span className="text-[11px] text-base-content/60">{STATUS_LABELS[status]}</span>
+          </div>
+        ))}
+      </div>
+
+      <p className="text-[11px] text-base-content/40 mt-3">
+        Las fechas ocupadas filtran los eventos; una fecha vacía abre la creación automáticamente.
+      </p>
     </div>
   );
 }

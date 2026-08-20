@@ -6,7 +6,6 @@ import { canConfirm, canStart, canComplete } from "~/utils/eventHelpers";
 import { toast } from "sonner";
 import { Search, X } from "lucide-react";
 import EventPageHeader from "~/components/events/EventPageHeader";
-import EventQuickStats from "~/components/events/EventQuickStats";
 import EventCalendarView from "~/components/events/EventCalendarView";
 import EventCard from "~/components/events/EventCard";
 import EventEmptyState from "~/components/events/EventEmptyState";
@@ -15,7 +14,6 @@ import EventDetailsModal from "~/components/events/EventsDetailsModals";
 import EventSubmoduleTabs from "~/components/events/EventSubmoduleTabs";
 import type { SubmoduleTab } from "~/components/events/EventSubmoduleTabs";
 import EventHistoryModule from "~/components/events/EventHistoryModule";
-import EventStatsModule from "~/components/events/EventStatsModule";
 
 function formatLocalDate(date: Date): string {
   const y = date.getFullYear();
@@ -45,7 +43,7 @@ export default function EventosPage() {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const activeSubmodule: SubmoduleTab = tabParam === "history" || tabParam === "stats" ? tabParam : "calendar";
+  const activeSubmodule: SubmoduleTab = tabParam === "history" ? "history" : "calendar";
 
   const [selectedDayFilter, setSelectedDayFilter] = useState("");
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -54,7 +52,6 @@ export default function EventosPage() {
 
   const [filterStatus, setFilterStatus] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentView, setCurrentView] = useState("dayGridMonth");
   const today = useMemo(() => formatLocalDate(new Date()), []);
   const visibleRangeRef = useRef<{ start: Date; end: Date } | null>(null);
   const [workflowLoading, setWorkflowLoading] = useState<string | null>(null);
@@ -85,7 +82,7 @@ export default function EventosPage() {
     }
   };
 
-  // Load current month on mount so EventCalendarView can render
+  // Load current month on mount so the calendar can render real events.
   useEffect(() => {
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -109,40 +106,34 @@ export default function EventosPage() {
     loadFullEvents();
   }, []);
 
-  const handleDatesSet = useCallback(
-    (gridStart: Date, gridEnd: Date, currentStart: Date, currentEnd: Date) => {
-      if (currentView === "dayGridMonth") {
-        const firstDay = new Date(currentStart.getFullYear(), currentStart.getMonth(), 1);
-        const lastDay = new Date(currentStart.getFullYear(), currentStart.getMonth() + 1, 0);
-        visibleRangeRef.current = { start: firstDay, end: lastDay };
-        loadEvents(firstDay, lastDay);
-      } else {
-        visibleRangeRef.current = { start: gridStart, end: gridEnd };
-        loadEvents(gridStart, gridEnd);
-      }
+  const handleMonthChange = useCallback(
+    (startDate: Date, endDate: Date) => {
+      visibleRangeRef.current = { start: startDate, end: endDate };
+      loadEvents(startDate, endDate);
 
-      // Clear selected day if it falls outside the visible grid
-      if (selectedDayFilter) {
-        const sel = new Date(selectedDayFilter + "T12:00:00");
-        if (sel < gridStart || sel > gridEnd) {
-          setSelectedDayFilter("");
-        }
+      // Clear the selected day if it falls outside the new month.
+      if (
+        selectedDayFilter &&
+        (selectedDayFilter < formatLocalDate(startDate) ||
+          selectedDayFilter > formatLocalDate(endDate))
+      ) {
+        setSelectedDayFilter("");
       }
     },
-    [currentView, selectedDayFilter]
+    [selectedDayFilter]
   );
 
   const handleDayClick = (dateStr: string) => {
-    setSelectedDayFilter(dateStr === selectedDayFilter ? "" : dateStr);
+    const hasEvent = events.some((event) => getDateOnly(event.eventDate) === dateStr);
+    setSelectedDayFilter(dateStr);
+    if (!hasEvent) {
+      setCreateModalOpen(true);
+    }
   };
 
   const openDetails = (publicId: string) => {
     setSelectedEventId(publicId);
     setDetailsModalOpen(true);
-  };
-
-  const handleEventClick = (event: { publicId: string }) => {
-    openDetails(event.publicId);
   };
 
   const openNewEvent = () => {
@@ -235,10 +226,7 @@ export default function EventosPage() {
       <EventPageHeader
         onCreateClick={openNewEvent}
         onRefresh={refreshCalendar}
-        monthCount={events.length}
       />
-
-      <EventQuickStats events={fullEvents} />
 
       {/* Submodule tabs */}
       <EventSubmoduleTabs
@@ -251,20 +239,13 @@ export default function EventosPage() {
         <div className="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-6 items-start min-w-0">
           {/* Left: Calendar */}
           <div className="min-w-0">
-            {loading && events.length === 0 ? (
-              <div className="bg-base-100 border border-base-300/20 rounded-xl p-8 flex items-center justify-center">
-                <span className="loading loading-spinner loading-md text-primary" />
-              </div>
-            ) : (
-              <EventCalendarView
-                events={events}
-                selectedDate={selectedDayFilter}
-                onDateClick={handleDayClick}
-                onEventClick={handleEventClick}
-                onViewChange={setCurrentView}
-                onDatesSet={handleDatesSet}
-              />
-            )}
+            <EventCalendarView
+              events={events}
+              loading={loading}
+              selectedDate={selectedDayFilter}
+              onDateClick={handleDayClick}
+              onMonthChange={handleMonthChange}
+            />
           </div>
 
           {/* Right: Event list */}
@@ -373,15 +354,6 @@ export default function EventosPage() {
       {/* ===== HISTORIAL SUBMODULE ===== */}
       {activeSubmodule === "history" && (
         <EventHistoryModule
-          events={fullEvents}
-          loading={fullEventsLoading}
-          onViewDetails={openDetails}
-        />
-      )}
-
-      {/* ===== ESTADÍSTICAS SUBMODULE ===== */}
-      {activeSubmodule === "stats" && (
-        <EventStatsModule
           events={fullEvents}
           loading={fullEventsLoading}
           onViewDetails={openDetails}
